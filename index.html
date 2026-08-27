@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roda das Competências</title>
+<meta name="description" content="Avalie suas competências de 0 a 10 e veja sua roda.">
+<meta property="og:title" content="Roda das Competências">
+<meta property="og:description" content="Escaneie, avalie suas competências de 0 a 10 e veja sua roda na hora.">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --accent-ink: #ffffff;
+    --ok: #006300;
+    --warn-bg: #fdf6e3;
+    --warn-bord: #eda100;
+    --shadow: 0 1px 2px rgba(11,11,11,0.05), 0 8px 24px -12px rgba(11,11,11,0.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --accent: #3987e5;
+      --accent-ink: #ffffff;
+      --ok: #0ca30c;
+      --warn-bg: #2a2410;
+      --warn-bord: #c98500;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.6);
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 20px 16px 48px; }
+  .wrap.largo { max-width: 960px; }
+
+  header.topo { text-align: center; padding: 8px 0 4px; }
+  .kicker {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 { font-size: 26px; line-height: 1.2; letter-spacing: -0.02em; margin-top: 4px; }
+  .sub { color: var(--ink2); font-size: 14px; margin-top: 6px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 16px;
+    margin-top: 16px;
+  }
+
+  .palco { position: relative; padding: 4px 0 0; }
+  .palco::before {
+    content: ""; position: absolute; inset: -8% 4%; pointer-events: none;
+    background: radial-gradient(closest-side at 50% 42%, rgba(42,120,214,0.09), transparent 72%);
+  }
+  @media (prefers-color-scheme: dark) {
+    .palco::before { background: radial-gradient(closest-side at 50% 42%, rgba(57,135,229,0.13), transparent 72%); }
+  }
+  .palco svg { display: block; width: 100%; height: auto; position: relative; }
+
+  label.campo { display: block; font-size: 13px; font-weight: 600; color: var(--ink2); margin-bottom: 6px; }
+  input[type="text"] {
+    width: 100%; padding: 12px 14px; font-size: 16px;
+    border: 1px solid var(--baseline); border-radius: 12px;
+    background: var(--surface); color: var(--ink); outline: none;
+  }
+  input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+
+  .linha-comp { padding: 12px 0 14px; border-bottom: 1px solid var(--grid); }
+  .linha-comp:last-child { border-bottom: none; padding-bottom: 4px; }
+  .comp-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .chip { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+  .comp-nome { font-size: 15px; font-weight: 600; flex: 1; min-width: 0; }
+  .comp-valor { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink2); min-width: 2ch; text-align: right; }
+  .comp-valor.tem { color: var(--ink); }
+  .notas { display: flex; gap: 4px; }
+  .notas button {
+    flex: 1; min-width: 0; height: 40px; border-radius: 10px;
+    border: 1px solid var(--baseline); background: var(--surface); color: var(--ink2);
+    font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums; cursor: pointer; padding: 0;
+    transition: transform 0.08s ease;
+  }
+  .notas button:active { transform: scale(0.92); }
+  .notas button[aria-pressed="true"] {
+    background: var(--marca, var(--accent)); border-color: var(--marca, var(--accent));
+    color: #fff; font-weight: 700;
+  }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 14px 18px; margin-top: 12px;
+    border: none; border-radius: 14px; cursor: pointer;
+    font: 700 16px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--accent); color: var(--accent-ink);
+    box-shadow: var(--shadow);
+    transition: transform 0.08s ease, opacity 0.15s ease;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+  .btn.fantasma { background: var(--surface); color: var(--ink); border: 1px solid var(--baseline); box-shadow: none; }
+  .btn svg { flex: none; }
+
+  .aviso {
+    margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+    background: var(--warn-bg); border: 1px solid var(--warn-bord);
+    font-size: 13px; color: var(--ink2); display: flex; gap: 8px; align-items: flex-start;
+  }
+  .aviso svg { flex: none; margin-top: 2px; }
+
+  .progresso { font-size: 13px; color: var(--muted); text-align: center; margin-top: 10px; font-variant-numeric: tabular-nums; }
+
+  .celebra { text-align: center; padding-top: 8px; }
+  .celebra .selo {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: color-mix(in srgb, var(--ok) 12%, var(--surface));
+    color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
+    font-size: 13px; font-weight: 700; padding: 6px 14px; border-radius: 999px;
+  }
+
+  .rodape { text-align: center; margin-top: 28px; font-size: 12px; color: var(--muted); }
+  .rodape a, .rodape button.link {
+    color: var(--muted); text-decoration: underline; background: none; border: none;
+    font: inherit; cursor: pointer; padding: 0;
+  }
+
+  /* ---- modo apresentar ---- */
+  .apres-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 760px) { .apres-grid { grid-template-columns: 340px 1fr; align-items: start; } }
+  .qr-box { text-align: center; }
+  .qr-box .qr-svg { display: inline-block; background: #ffffff; border-radius: 16px; padding: 12px; border: 1px solid var(--border); }
+  .qr-box .qr-svg svg { display: block; width: 100%; max-width: 260px; height: auto; }
+  .link-copiar {
+    display: flex; gap: 8px; margin-top: 12px; align-items: stretch;
+  }
+  .link-copiar input {
+    flex: 1; min-width: 0; font-size: 13px; padding: 10px 12px;
+    border: 1px solid var(--baseline); border-radius: 10px;
+    background: var(--page); color: var(--ink2);
+  }
+  .link-copiar .btn { width: auto; margin: 0; padding: 10px 14px; font-size: 14px; }
+
+  .contador { display: flex; align-items: baseline; gap: 8px; justify-content: center; margin-top: 4px; }
+  .contador b { font-size: 40px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .contador span { color: var(--ink2); font-size: 14px; }
+  .pulso { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 6px; vertical-align: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .pulso { animation: pulso 2s ease-in-out infinite; }
+    @keyframes pulso { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  }
+
+  .mini-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-top: 12px; }
+  .mini { text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 6px 8px; }
+  .mini .nome { font-size: 12px; font-weight: 600; color: var(--ink2); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mini svg { width: 100%; height: auto; display: block; }
+
+  .secao-titulo { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 20px 0 4px; }
+  .vazio { color: var(--muted); font-size: 14px; text-align: center; padding: 24px 8px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(8px);
+    background: var(--ink); color: var(--page); font-size: 14px; font-weight: 600;
+    padding: 10px 18px; border-radius: 999px; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease; max-width: 90vw; text-align: center;
+  }
+  .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="app" class="wrap"></div>
+<div id="toast" class="toast" role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- configuração ---------- */
+  var SUPA_URL = 'https://tqtkjmdkmtqgjcchonax.supabase.co';
+  var SUPA_KEY = 'sb_publishable_Mpop5d-vbhpWpEFcqOmqSg_uzQCFvoI';
+  var TABELA = 'roda_respostas';
+
+  var COMPETENCIAS_PADRAO = [
+    'Comunicação', 'Trabalho em equipe', 'Liderança', 'Organização',
+    'Criatividade', 'Resolução de problemas', 'Inteligência emocional', 'Aprendizado contínuo'
+  ];
+
+  var params = new URLSearchParams(location.search);
+  var COMPETENCIAS = COMPETENCIAS_PADRAO;
+  if (params.get('c')) {
+    var custom = params.get('c').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    if (custom.length >= 3 && custom.length <= 12) COMPETENCIAS = custom.map(function (s) { return s.slice(0, 40); });
+  }
+  var N = COMPETENCIAS.length;
+  var SESSAO = (params.get('s') || 'geral').slice(0, 60);
+  var MODO_APRESENTAR = params.get('modo') === 'apresentar';
+
+  /* paleta categórica validada (ordem fixa, claro/escuro) */
+  var SLOTS_CLARO = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+  var SLOTS_ESCURO = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+  var TEMA_CLARO = { slots: SLOTS_CLARO, surface: '#fcfcfb', ink: '#0b0b0b', ink2: '#52514e', muted: '#898781', grid: '#e1e0d9', baseline: '#c3c2b7' };
+  var TEMA_ESCURO = { slots: SLOTS_ESCURO, surface: '#1a1a19', ink: '#ffffff', ink2: '#c3c2b7', muted: '#898781', grid: '#2c2c2a', baseline: '#383835', escuro: true };
+  var mqEscuro = window.matchMedia('(prefers-color-scheme: dark)');
+  function temaAtual() { return mqEscuro.matches ? TEMA_ESCURO : TEMA_CLARO; }
+  function corSlot(i, tema) { return tema.slots[i % tema.slots.length]; }
+
+  /* ---------- estado ---------- */
+  var LS_CHAVE = 'roda:' + SESSAO;
+  var salvo = null;
+  try { salvo = JSON.parse(localStorage.getItem(LS_CHAVE) || 'null'); } catch (e) { salvo = null; }
+  if (salvo && (!Array.isArray(salvo.valores) || salvo.valores.length !== N)) salvo = null;
+
+  var uid = null;
+  try {
+    uid = localStorage.getItem('roda:uid');
+    if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('roda:uid', uid); }
+  } catch (e) { uid = 'u' + Math.random().toString(36).slice(2, 10); }
+
+  var estado = {
+    nome: salvo ? salvo.nome : '',
+    valores: salvo ? salvo.valores.slice() : new Array(N).fill(null),
+    enviado: !!(salvo && salvo.enviado),
+    sincronizado: !!(salvo && salvo.sincronizado),
+    editando: false
+  };
+
+  function persistir() {
+    try {
+      localStorage.setItem(LS_CHAVE, JSON.stringify({
+        nome: estado.nome, valores: estado.valores, enviado: estado.enviado, sincronizado: estado.sincronizado
+      }));
+    } catch (e) { /* storage indisponível: segue em memória */ }
+  }
+
+  /* ---------- desenho da roda (SVG string, cores literais pro export) ---------- */
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function polar(cx, cy, r, ang) {
+    return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
+  }
+  function setorPath(cx, cy, r, a0, a1) {
+    var p0 = polar(cx, cy, r, a0), p1 = polar(cx, cy, r, a1);
+    var grande = (a1 - a0) > Math.PI ? 1 : 0;
+    return 'M' + cx + ',' + cy + ' L' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) +
+      ' A' + r + ',' + r + ' 0 ' + grande + ' 1 ' + p1[0].toFixed(2) + ',' + p1[1].toFixed(2) + ' Z';
+  }
+  function quebraRotulo(nome) {
+    if (nome.length <= 11) return [nome];
+    var palavras = nome.split(' ');
+    if (palavras.length === 1) return [nome];
+    var l1 = '', l2 = '';
+    for (var i = 0; i < palavras.length; i++) {
+      if ((l1 + ' ' + palavras[i]).trim().length <= 12 && !l2) l1 = (l1 + ' ' + palavras[i]).trim();
+      else l2 = (l2 + ' ' + palavras[i]).trim();
+    }
+    return l2 ? [l1, l2] : [l1];
+  }
+
+  /**
+   * opts: { valores, tema, rotulos (bool), numeros (bool), titulo, subtitulo, fundo (bool) }
+   */
+  function svgRoda(opts) {
+    var tema = opts.tema || temaAtual();
+    var valores = opts.valores;
+    var comLabels = !!opts.rotulos;
+    var margem = comLabels ? 100 : 10;
+    var extraTopo = opts.titulo ? 64 : 0;
+    var R = 150, cx = R + margem, cy = R + margem + extraTopo;
+    var W = 2 * (R + margem), H = 2 * (R + margem) + extraTopo + (opts.subtitulo ? 8 : 0);
+    var pad = (Math.PI / 180) * (N > 8 ? 1.0 : 1.4);
+    var passo = 2 * Math.PI / N;
+    var out = [];
+
+    out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Roda das competências">');
+    if (opts.fundo) out.push('<rect width="' + W + '" height="' + H + '" fill="' + tema.surface + '"/>');
+
+    if (opts.titulo) {
+      out.push('<text x="' + (W / 2) + '" y="30" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="19" font-weight="700" fill="' + tema.ink + '">' + esc(opts.titulo) + '</text>');
+      if (opts.subtitulo) out.push('<text x="' + (W / 2) + '" y="52" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" fill="' + tema.ink2 + '">' + esc(opts.subtitulo) + '</text>');
+    }
+
+    /* trilhas (fundo de cada setor) */
+    var i, a0, a1, mid;
+    for (i = 0; i < N; i++) {
+      a0 = -Math.PI / 2 + i * passo + pad; a1 = -Math.PI / 2 + (i + 1) * passo - pad;
+      out.push('<path d="' + setorPath(cx, cy, R, a0, a1) + '" fill="' + tema.grid + '" fill-opacity="' + (tema.escuro ? 0.8 : 0.45) + '"/>');
+    }
+    /* anéis de referência 2..10 */
+    for (i = 1; i <= 5; i++) {
+      out.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + (R * i / 5) + '" fill="none" stroke="' + tema.surface + '" stroke-width="1.5"/>');
+    }
+    /* preenchimento por valor */
+    for (i = 0; i < N; i++) {
+      var v = valores[i];
+      if (v === null || v === undefined) continue;
+      a0 = -Math.PI / 2 + i * passo + pad; a1 = -Math.PI / 2 + (i + 1) * passo - pad;
+      if (v > 0) {
+        var rV = Math.max(R * v / 10, 8);
+        out.push('<path d="' + setorPath(cx, cy, rV, a0, a1) + '" fill="' + corSlot(i, tema) + '"/>');
+      }
+    }
+    /* miolo */
+    out.push('<circle cx="' + cx + '" cy="' + cy + '" r="7" fill="' + tema.surface + '" stroke="' + tema.baseline + '" stroke-width="1.5"/>');
+
+    /* números */
+    if (opts.numeros) {
+      for (i = 0; i < N; i++) {
+        var v2 = valores[i];
+        if (v2 === null || v2 === undefined) continue;
+        mid = -Math.PI / 2 + (i + 0.5) * passo;
+        var rFill = R * v2 / 10;
+        var dentro = rFill >= 44; /* preenchimento fundo o bastante pro número caber dentro */
+        var rNum = dentro ? rFill - 15 : Math.max(rFill + 15, 24);
+        var pn = polar(cx, cy, rNum, mid);
+        var estilo = dentro
+          ? 'fill="#ffffff" stroke="rgba(11,11,11,0.4)" stroke-width="2.5" paint-order="stroke" stroke-linejoin="round"'
+          : 'fill="' + tema.ink + '"';
+        out.push('<text x="' + pn[0].toFixed(1) + '" y="' + (pn[1] + 5).toFixed(1) + '" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="14" font-weight="700" ' + estilo + '>' + (Math.round(v2 * 10) / 10) + '</text>');
+      }
+    }
+
+    /* rótulos das competências */
+    if (comLabels) {
+      for (i = 0; i < N; i++) {
+        mid = -Math.PI / 2 + (i + 0.5) * passo;
+        var c = Math.cos(mid), s = Math.sin(mid);
+        var pl = polar(cx, cy, R + 20, mid);
+        var anchor = Math.abs(c) < 0.34 ? 'middle' : (c > 0 ? 'start' : 'end');
+        var linhas = quebraRotulo(COMPETENCIAS[i]);
+        var dy0 = s < -0.34 ? (linhas.length > 1 ? -14 : -2) : (s > 0.34 ? 8 : (linhas.length > 1 ? -6 : 2));
+        out.push('<text x="' + pl[0].toFixed(1) + '" y="' + (pl[1] + dy0).toFixed(1) + '" text-anchor="' + anchor + '" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12.5" font-weight="600" fill="' + tema.ink2 + '">');
+        for (var j = 0; j < linhas.length; j++) {
+          out.push('<tspan x="' + pl[0].toFixed(1) + '" dy="' + (j === 0 ? 0 : 14) + '">' + esc(linhas[j]) + '</tspan>');
+        }
+        out.push('</text>');
+      }
+    }
+    out.push('</svg>');
+    return out.join('');
+  }
+
+  /* ---------- rede (Supabase REST) ---------- */
+  var cabecalhos = {
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Content-Type': 'application/json'
+  };
+  var servidorOk = null; /* null = desconhecido, true/false após 1ª chamada */
+
+  function enviarResposta() {
+    var corpo = JSON.stringify({
+      sessao: SESSAO,
+      nome: estado.nome,
+      notas: { uid: uid, competencias: COMPETENCIAS, valores: estado.valores }
+    });
+    return fetch(SUPA_URL + '/rest/v1/' + TABELA, {
+      method: 'POST', headers: cabecalhos, body: corpo
+    }).then(function (r) {
+      servidorOk = r.ok;
+      return r.ok;
+    }).catch(function () { servidorOk = false; return false; });
+  }
+
+  function buscarRespostas() {
+    var q = SUPA_URL + '/rest/v1/' + TABELA +
+      '?sessao=eq.' + encodeURIComponent(SESSAO) +
+      '&select=nome,notas,criado_em&order=criado_em.asc&limit=400';
+    return fetch(q, { headers: cabecalhos }).then(function (r) {
+      servidorOk = r.ok;
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  /* última resposta por pessoa (uid; fallback nome) */
+  function deduplicar(linhas) {
+    var porChave = {};
+    for (var i = 0; i < linhas.length; i++) {
+      var l = linhas[i];
+      if (!l.notas || !Array.isArray(l.notas.valores)) continue;
+      var chave = l.notas.uid || ('nome:' + String(l.nome).trim().toLowerCase());
+      porChave[chave] = l; /* ordem asc: a última sobrescreve */
+    }
+    var out = [];
+    for (var k in porChave) out.push(porChave[k]);
+    out.sort(function (a, b) { return a.criado_em < b.criado_em ? -1 : 1; });
+    return out;
+  }
+
+  /* ---------- helpers de UI ---------- */
+  var app = document.getElementById('app');
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('on'); }, 2600);
+  }
+
+  var ICONES = {
+    baixar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 19h16"/></svg>',
+    compartilhar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14V4"/><path d="m8 7 4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg>',
+    editar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
+    copiar: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+    atualizar: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>',
+    alerta: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>',
+    check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg>',
+    enviar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 14-7-4 14-3.5-5.5L5 12Z"/></svg>'
+  };
+
+  /* ---------- export PNG ---------- */
+  function baixarPng(svgString, arquivo, escala) {
+    var blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth * escala;
+      canvas.height = img.naturalHeight * escala;
+      var ctx = canvas.getContext('2d');
+      ctx.scale(escala, escala);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(function (png) {
+        if (!png) { toast('Não deu pra gerar a imagem'); return; }
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(png);
+        a.download = arquivo;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+      }, 'image/png');
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); toast('Não deu pra gerar a imagem'); };
+    img.src = url;
+  }
+
+  function compartilharPng(svgString, arquivo, texto) {
+    var blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth * 2;
+      canvas.height = img.naturalHeight * 2;
+      var ctx = canvas.getContext('2d');
+      ctx.scale(2, 2);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(function (png) {
+        if (!png) { toast('Não deu pra gerar a imagem'); return; }
+        var file = new File([png], arquivo, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], text: texto }).catch(function () { /* usuário cancelou */ });
+        } else {
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(png);
+          a.download = arquivo;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+          toast('Imagem baixada, é só anexar');
+        }
+      }, 'image/png');
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); toast('Não deu pra gerar a imagem'); };
+    img.src = url;
+  }
+
+  function svgExport() {
+    var hoje = new Date();
+    var data = String(hoje.getDate()).padStart(2, '0') + '/' + String(hoje.getMonth() + 1).padStart(2, '0') + '/' + hoje.getFullYear();
+    return svgRoda({
+      valores: estado.valores, tema: TEMA_CLARO, rotulos: true, numeros: true, fundo: true,
+      titulo: 'Roda das Competências', subtitulo: estado.nome + ' · ' + data
+    });
+  }
+
+  /* ---------- tela: preencher ---------- */
+  function renderPreencher() {
+    var completos = estado.valores.filter(function (v) { return v !== null; }).length;
+    var pronto = completos === N && estado.nome.trim().length >= 2;
+    var linhas = COMPETENCIAS.map(function (nome, i) {
+      var cor = corSlot(i, temaAtual());
+      var botoes = '';
+      for (var v = 0; v <= 10; v++) {
+        var sel = estado.valores[i] === v;
+        botoes += '<button type="button" data-i="' + i + '" data-v="' + v + '" aria-pressed="' + sel + '" style="--marca:' + cor + '">' + v + '</button>';
+      }
+      return '<div class="linha-comp">' +
+        '<div class="comp-cab"><span class="chip" style="background:' + cor + '"></span>' +
+        '<span class="comp-nome">' + esc(nome) + '</span>' +
+        '<span class="comp-valor' + (estado.valores[i] !== null ? ' tem' : '') + '">' + (estado.valores[i] !== null ? estado.valores[i] : '–') + '</span></div>' +
+        '<div class="notas" role="group" aria-label="' + esc(nome) + ', nota de 0 a 10">' + botoes + '</div>' +
+        '</div>';
+    }).join('');
+
+    app.className = 'wrap';
+    app.innerHTML =
+      '<header class="topo">' +
+      '<div class="kicker">Autoavaliação</div>' +
+      '<h1>Roda das Competências</h1>' +
+      '<p class="sub">Dê uma nota de 0 a 10 pra cada competência. A sua roda se desenha sozinha.</p>' +
+      '</header>' +
+      '<div class="palco" id="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
+      '<div class="card">' +
+      '<label class="campo" for="nome">Seu nome</label>' +
+      '<input type="text" id="nome" maxlength="40" autocomplete="name" placeholder="Como você quer aparecer" value="' + esc(estado.nome) + '">' +
+      '</div>' +
+      '<div class="card">' + linhas + '</div>' +
+      '<button class="btn" id="enviar" ' + (pronto ? '' : 'disabled') + '>' + ICONES.enviar + (estado.enviado ? 'Reenviar minha roda' : 'Enviar minha roda') + '</button>' +
+      '<p class="progresso" id="progresso">' + completos + ' de ' + N + ' competências avaliadas</p>' +
+      '<div class="rodape"><button class="link" id="ir-apresentar">Modo apresentador</button></div>';
+
+    document.getElementById('nome').addEventListener('input', function (e) {
+      estado.nome = e.target.value;
+      atualizarEnviar();
+      persistir();
+    });
+
+    app.querySelectorAll('.notas button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var i = +b.dataset.i, v = +b.dataset.v;
+        estado.valores[i] = v;
+        var grupo = b.parentElement;
+        grupo.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(+x.dataset.v === v)); });
+        var valorEl = grupo.previousElementSibling.querySelector('.comp-valor');
+        valorEl.textContent = v; valorEl.classList.add('tem');
+        document.getElementById('palco').innerHTML = svgRoda({ valores: estado.valores, rotulos: true, numeros: true });
+        atualizarEnviar();
+        persistir();
+      });
+    });
+
+    function atualizarEnviar() {
+      var c = estado.valores.filter(function (x) { return x !== null; }).length;
+      document.getElementById('progresso').textContent = c + ' de ' + N + ' competências avaliadas';
+      document.getElementById('enviar').disabled = !(c === N && estado.nome.trim().length >= 2);
+    }
+
+    document.getElementById('enviar').addEventListener('click', function () {
+      var btn = this;
+      estado.nome = estado.nome.trim().slice(0, 40);
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+      enviarResposta().then(function (ok) {
+        estado.enviado = true;
+        estado.sincronizado = ok;
+        estado.editando = false;
+        persistir();
+        renderPronto();
+      });
+    });
+
+    document.getElementById('ir-apresentar').addEventListener('click', irApresentar);
+  }
+
+  /* ---------- tela: pronto ---------- */
+  function renderPronto() {
+    app.className = 'wrap';
+    var avisoSync = estado.sincronizado ? '' :
+      '<div class="aviso">' + ICONES.alerta + '<span>Sua roda ficou salva <b>neste aparelho</b>, mas não chegou ao painel do apresentador. Você pode tentar de novo ou compartilhar a imagem.</span></div>' +
+      '<button class="btn fantasma" id="reenviar">Tentar enviar de novo</button>';
+
+    app.innerHTML =
+      '<header class="topo celebra">' +
+      '<span class="selo">' + ICONES.check + (estado.sincronizado ? 'Roda enviada' : 'Roda pronta') + '</span>' +
+      '<h1 style="margin-top:10px">' + esc(estado.nome) + '</h1>' +
+      '<p class="sub">Essa é a sua roda das competências de hoje.</p>' +
+      '</header>' +
+      '<div class="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
+      avisoSync +
+      '<button class="btn" id="compartilhar">' + ICONES.compartilhar + 'Compartilhar imagem</button>' +
+      '<button class="btn fantasma" id="baixar">' + ICONES.baixar + 'Baixar imagem</button>' +
+      '<button class="btn fantasma" id="editar">' + ICONES.editar + 'Ajustar minhas notas</button>' +
+      '<div class="rodape"><button class="link" id="ir-apresentar">Modo apresentador</button></div>';
+
+    var nomeArq = 'roda-' + estado.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') + '.png';
+    document.getElementById('compartilhar').addEventListener('click', function () {
+      compartilharPng(svgExport(), nomeArq, 'Minha Roda das Competências');
+    });
+    document.getElementById('baixar').addEventListener('click', function () {
+      baixarPng(svgExport(), nomeArq, 2);
+      toast('Imagem salva nos downloads');
+    });
+    document.getElementById('editar').addEventListener('click', function () {
+      estado.editando = true;
+      renderPreencher();
+    });
+    var re = document.getElementById('reenviar');
+    if (re) re.addEventListener('click', function () {
+      re.textContent = 'Enviando...';
+      enviarResposta().then(function (ok) {
+        estado.sincronizado = ok;
+        persistir();
+        if (ok) { toast('Agora foi, roda enviada'); renderPronto(); }
+        else { re.textContent = 'Tentar enviar de novo'; toast('Ainda sem conexão com o painel'); }
+      });
+    });
+    document.getElementById('ir-apresentar').addEventListener('click', irApresentar);
+  }
+
+  function irApresentar() {
+    var u = new URL(location.href);
+    u.searchParams.set('modo', 'apresentar');
+    location.href = u.toString();
+  }
+
+  /* ---------- tela: apresentar ---------- */
+  var pollTimer = null;
+
+  function urlPreencher() {
+    var u = new URL(location.href);
+    u.searchParams.delete('modo');
+    return u.toString();
+  }
+
+  function renderApresentar() {
+    var link = urlPreencher();
+    var qrSvg = '';
+    try {
+      if (typeof qrcode === 'undefined') throw new Error('lib');
+      var qr = qrcode(0, 'M');
+      qr.addData(link);
+      qr.make();
+      qrSvg = qr.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+    } catch (e) {
+      qrSvg = '<p class="vazio">O QR não carregou (confira a internet e recarregue). Enquanto isso, compartilhe o link abaixo.</p>';
+    }
+
+    app.className = 'wrap largo';
+    app.innerHTML =
+      '<header class="topo">' +
+      '<div class="kicker">Modo apresentador</div>' +
+      '<h1>Roda das Competências</h1>' +
+      '<p class="sub">Peça pra turma apontar a câmera pro QR e preencher no celular.</p>' +
+      '</header>' +
+      '<div class="apres-grid">' +
+      '<div class="card qr-box">' +
+      '<div class="qr-svg" id="qr">' + qrSvg + '</div>' +
+      '<div class="link-copiar">' +
+      '<input type="text" readonly value="' + esc(link) + '" id="campo-link">' +
+      '<button class="btn" id="copiar">' + ICONES.copiar + 'Copiar</button>' +
+      '</div>' +
+      '<button class="btn fantasma" id="baixar-qr">' + ICONES.baixar + 'Baixar QR pra apresentação</button>' +
+      '</div>' +
+      '<div>' +
+      '<div class="card">' +
+      '<div class="contador"><span class="pulso" id="pulso"></span><b id="qtd">–</b><span>respostas</span>' +
+      '<button class="btn fantasma" id="atualizar" style="width:auto;margin:0 0 0 auto;padding:8px 12px;font-size:13px">' + ICONES.atualizar + 'Atualizar</button></div>' +
+      '<div id="estado-servidor"></div>' +
+      '</div>' +
+      '<div id="media-bloco"></div>' +
+      '<div class="secao-titulo" id="titulo-individuais" hidden>Rodas individuais</div>' +
+      '<div class="mini-grade" id="minis"></div>' +
+      '</div>' +
+      '</div>' +
+      '<div class="rodape"><a href="' + esc(link) + '">Ir pra tela de preencher</a></div>';
+
+    document.getElementById('copiar').addEventListener('click', function () {
+      var campo = document.getElementById('campo-link');
+      campo.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
+        function () { toast('Link copiado'); },
+        function () { try { document.execCommand('copy'); toast('Link copiado'); } catch (e) { toast('Copie manualmente'); } }
+      );
+    });
+
+    document.getElementById('baixar-qr').addEventListener('click', function () {
+      try {
+        var qr2 = qrcode(0, 'M');
+        qr2.addData(link);
+        qr2.make();
+        var n = qr2.getModuleCount();
+        var cs = 16, mg = 4 * cs, tam = n * cs + 2 * mg;
+        var canvas = document.createElement('canvas');
+        canvas.width = tam; canvas.height = tam + 90;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#0b0b0b';
+        for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr2.isDark(r, c)) ctx.fillRect(mg + c * cs, mg + r * cs, cs, cs);
+        ctx.font = '700 34px system-ui, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('Roda das Competências', tam / 2, tam + 30);
+        ctx.font = '400 24px system-ui, sans-serif'; ctx.fillStyle = '#52514e';
+        ctx.fillText('Aponte a câmera e preencha', tam / 2, tam + 66);
+        canvas.toBlob(function (png) {
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(png);
+          a.download = 'qr-roda-das-competencias.png';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+        }, 'image/png');
+      } catch (e) { toast('Não deu pra gerar o QR'); }
+    });
+
+    document.getElementById('atualizar').addEventListener('click', function () { carregarPainel(true); });
+
+    carregarPainel(false);
+    clearInterval(pollTimer);
+    pollTimer = setInterval(function () {
+      if (!document.hidden) carregarPainel(false);
+    }, 5000);
+  }
+
+  function carregarPainel(manual) {
+    buscarRespostas().then(function (linhas) {
+      var pessoas = deduplicar(linhas);
+      pintarPainel(pessoas);
+      if (manual) toast('Painel atualizado');
+    }).catch(function () {
+      document.getElementById('qtd').textContent = '–';
+      document.getElementById('pulso').style.background = 'var(--warn-bord)';
+      document.getElementById('estado-servidor').innerHTML =
+        '<div class="aviso">' + ICONES.alerta + '<span>O painel ao vivo ainda não está ligado (tabela não encontrada no banco). Cada pessoa ainda consegue preencher e compartilhar a própria imagem normalmente.</span></div>';
+    });
+  }
+
+  function pintarPainel(pessoas) {
+    document.getElementById('qtd').textContent = pessoas.length;
+    document.getElementById('pulso').style.background = 'var(--ok)';
+    document.getElementById('estado-servidor').innerHTML = '';
+
+    var mediaBloco = document.getElementById('media-bloco');
+    var minis = document.getElementById('minis');
+    var tituloInd = document.getElementById('titulo-individuais');
+
+    if (!pessoas.length) {
+      mediaBloco.innerHTML = '<div class="card"><p class="vazio">Nenhuma resposta ainda. Assim que alguém enviar, a roda média da turma aparece aqui ao vivo.</p></div>';
+      minis.innerHTML = '';
+      tituloInd.hidden = true;
+      return;
+    }
+
+    var soma = new Array(N).fill(0), qtd = new Array(N).fill(0);
+    pessoas.forEach(function (p) {
+      for (var i = 0; i < N; i++) {
+        var v = p.notas.valores[i];
+        if (typeof v === 'number') { soma[i] += v; qtd[i]++; }
+      }
+    });
+    var media = soma.map(function (s, i) { return qtd[i] ? Math.round((s / qtd[i]) * 10) / 10 : null; });
+
+    mediaBloco.innerHTML =
+      '<div class="secao-titulo">Média da turma</div>' +
+      '<div class="card palco">' + svgRoda({ valores: media, rotulos: true, numeros: true }) + '</div>';
+
+    tituloInd.hidden = false;
+    minis.innerHTML = pessoas.map(function (p) {
+      return '<div class="mini">' + svgRoda({ valores: p.notas.valores, rotulos: false, numeros: false }) +
+        '<div class="nome" title="' + esc(p.nome) + '">' + esc(p.nome) + '</div></div>';
+    }).join('');
+  }
+
+  /* ---------- boot ---------- */
+  mqEscuro.addEventListener('change', function () {
+    if (MODO_APRESENTAR) renderApresentar();
+    else if (estado.enviado && !estado.editando) renderPronto();
+    else renderPreencher();
+  });
+
+  if (MODO_APRESENTAR) renderApresentar();
+  else if (estado.enviado && !estado.editando) renderPronto();
+  else renderPreencher();
+})();
+</script>
+</body>
+</html>
