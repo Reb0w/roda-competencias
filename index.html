@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Roda das Competências</title>
-<meta name="description" content="Avalie suas competências de 0 a 10 e veja sua roda.">
-<meta property="og:title" content="Roda das Competências">
-<meta property="og:description" content="Escaneie, avalie suas competências de 0 a 10 e veja sua roda na hora.">
+<title>Gráfico de Competências</title>
+<meta name="description" content="Avalie suas competências de 0 a 10 e veja seu gráfico.">
+<meta property="og:title" content="Gráfico de Competências">
+<meta property="og:description" content="Escaneie, avalie suas competências de 0 a 10 e veja seu gráfico na hora.">
 <style>
   :root {
     color-scheme: light;
@@ -73,16 +73,9 @@
     margin-top: 16px;
   }
 
-  .palco { position: relative; padding: 4px 0 0; }
-  .palco::before {
-    content: ""; position: absolute; inset: -8% 4%; pointer-events: none;
-    background: radial-gradient(closest-side at 50% 42%, rgba(42,120,214,0.09), transparent 72%);
-  }
-  @media (prefers-color-scheme: dark) {
-    .palco::before { background: radial-gradient(closest-side at 50% 42%, rgba(57,135,229,0.13), transparent 72%); }
-  }
-  .palco svg { display: block; width: 100%; height: auto; position: relative; }
-  .palco.interativa svg { touch-action: none; cursor: pointer; }
+  .grafico svg { display: block; width: 100%; height: auto; }
+  .grafico.interativa svg { touch-action: none; cursor: pointer; }
+  .grafico.interativa svg rect.alvo:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 
   label.campo { display: block; font-size: 13px; font-weight: 600; color: var(--ink2); margin-bottom: 6px; }
   input[type="text"] {
@@ -91,27 +84,6 @@
     background: var(--surface); color: var(--ink); outline: none;
   }
   input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
-
-  .linha-comp { padding: 12px 0 14px; border-bottom: 1px solid var(--grid); }
-  .linha-comp:last-child { border-bottom: none; padding-bottom: 4px; }
-  .comp-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-  .chip { width: 12px; height: 12px; border-radius: 4px; flex: none; }
-  .comp-nome { font-size: 15px; font-weight: 600; flex: 1; min-width: 0; }
-  .comp-valor { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink2); min-width: 2ch; text-align: right; }
-  .comp-valor.tem { color: var(--ink); }
-  .notas { display: flex; gap: 4px; }
-  .notas button {
-    flex: 1; min-width: 0; height: 40px; border-radius: 10px;
-    border: 1px solid var(--baseline); background: var(--surface); color: var(--ink2);
-    font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-variant-numeric: tabular-nums; cursor: pointer; padding: 0;
-    transition: transform 0.08s ease;
-  }
-  .notas button:active { transform: scale(0.92); }
-  .notas button[aria-pressed="true"] {
-    background: var(--marca, var(--accent)); border-color: var(--marca, var(--accent));
-    color: #fff; font-weight: 700;
-  }
 
   .btn {
     display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -263,104 +235,58 @@
   function esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-  function polar(cx, cy, r, ang) {
-    return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
-  }
-  function setorPath(cx, cy, r, a0, a1) {
-    var p0 = polar(cx, cy, r, a0), p1 = polar(cx, cy, r, a1);
-    var grande = (a1 - a0) > Math.PI ? 1 : 0;
-    return 'M' + cx + ',' + cy + ' L' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) +
-      ' A' + r + ',' + r + ' 0 ' + grande + ' 1 ' + p1[0].toFixed(2) + ',' + p1[1].toFixed(2) + ' Z';
-  }
-  function quebraRotulo(nome) {
-    if (nome.length <= 11) return [nome];
-    var palavras = nome.split(' ');
-    if (palavras.length === 1) return [nome];
-    var l1 = '', l2 = '';
-    for (var i = 0; i < palavras.length; i++) {
-      if ((l1 + ' ' + palavras[i]).trim().length <= 12 && !l2) l1 = (l1 + ' ' + palavras[i]).trim();
-      else l2 = (l2 + ' ' + palavras[i]).trim();
-    }
-    return l2 ? [l1, l2] : [l1];
-  }
+  /* geometria das barras, compartilhada entre o desenho e o toque */
+  var BW = 500, BPADX = 12, BTOPO = 8, BPITCH = 58, BTRILHA = 20, BTRILHA_W = BW - 2 * BPADX;
+  var FONTE = 'system-ui, -apple-system, Segoe UI, sans-serif';
 
   /**
-   * opts: { valores, tema, rotulos (bool), numeros (bool), titulo, subtitulo, fundo (bool) }
+   * opts: { valores, tema, rotulos, numeros, titulo, subtitulo, fundo, compacto, interativo }
    */
-  function svgRoda(opts) {
+  function svgBarras(opts) {
     var tema = opts.tema || temaAtual();
     var valores = opts.valores;
-    var comLabels = !!opts.rotulos;
-    var margem = comLabels ? 100 : 10;
-    var extraTopo = opts.titulo ? 64 : 0;
-    var R = 150, cx = R + margem, cy = R + margem + extraTopo;
-    var W = 2 * (R + margem), H = 2 * (R + margem) + extraTopo + (opts.subtitulo ? 8 : 0);
-    var pad = (Math.PI / 180) * (N > 8 ? 1.0 : 1.4);
-    var passo = 2 * Math.PI / N;
+    var compacto = !!opts.compacto;
+    var padX = compacto ? 4 : BPADX;
+    var pitch = compacto ? 15 : BPITCH;
+    var trilhaH = compacto ? 9 : BTRILHA;
+    var raio = compacto ? 4 : 5;
+    var topo = (opts.titulo ? 64 : 0) + (compacto ? 3 : BTOPO);
+    var trilhaW = BW - 2 * padX;
+    var H = topo + N * pitch + (compacto ? 3 : 10);
     var out = [];
 
-    out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Roda das competências">');
-    if (opts.fundo) out.push('<rect width="' + W + '" height="' + H + '" fill="' + tema.surface + '"/>');
+    out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + BW + ' ' + H + '" role="img" aria-label="Gráfico de competências">');
+    if (opts.fundo) out.push('<rect width="' + BW + '" height="' + H + '" fill="' + tema.surface + '"/>');
 
     if (opts.titulo) {
-      out.push('<text x="' + (W / 2) + '" y="30" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="19" font-weight="700" fill="' + tema.ink + '">' + esc(opts.titulo) + '</text>');
-      if (opts.subtitulo) out.push('<text x="' + (W / 2) + '" y="52" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" fill="' + tema.ink2 + '">' + esc(opts.subtitulo) + '</text>');
+      out.push('<text x="' + (BW / 2) + '" y="30" text-anchor="middle" font-family="' + FONTE + '" font-size="19" font-weight="700" fill="' + tema.ink + '">' + esc(opts.titulo) + '</text>');
+      if (opts.subtitulo) out.push('<text x="' + (BW / 2) + '" y="52" text-anchor="middle" font-family="' + FONTE + '" font-size="13" fill="' + tema.ink2 + '">' + esc(opts.subtitulo) + '</text>');
     }
 
-    /* trilhas (fundo de cada setor) */
-    var i, a0, a1, mid;
-    for (i = 0; i < N; i++) {
-      a0 = -Math.PI / 2 + i * passo + pad; a1 = -Math.PI / 2 + (i + 1) * passo - pad;
-      out.push('<path d="' + setorPath(cx, cy, R, a0, a1) + '" fill="' + tema.grid + '" fill-opacity="' + (tema.escuro ? 0.8 : 0.45) + '"/>');
-    }
-    /* anéis de referência 2..10 */
-    for (i = 1; i <= 5; i++) {
-      out.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + (R * i / 5) + '" fill="none" stroke="' + tema.surface + '" stroke-width="1.5"/>');
-    }
-    /* preenchimento por valor */
-    for (i = 0; i < N; i++) {
+    for (var i = 0; i < N; i++) {
       var v = valores[i];
-      if (v === null || v === undefined) continue;
-      a0 = -Math.PI / 2 + i * passo + pad; a1 = -Math.PI / 2 + (i + 1) * passo - pad;
-      if (v > 0) {
-        var rV = Math.max(R * v / 10, 8);
-        out.push('<path d="' + setorPath(cx, cy, rV, a0, a1) + '" fill="' + corSlot(i, tema) + '"/>');
+      var tem = v !== null && v !== undefined;
+      var yTop = topo + i * pitch;
+      var yTr = compacto ? yTop + 3 : yTop + 24;
+      if (opts.rotulos) {
+        out.push('<text x="' + padX + '" y="' + (yTop + 16) + '" font-family="' + FONTE + '" font-size="14" font-weight="600" fill="' + tema.ink + '">' + esc(COMPETENCIAS[i]) + '</text>');
       }
-    }
-    /* miolo */
-    out.push('<circle cx="' + cx + '" cy="' + cy + '" r="7" fill="' + tema.surface + '" stroke="' + tema.baseline + '" stroke-width="1.5"/>');
-
-    /* números */
-    if (opts.numeros) {
-      for (i = 0; i < N; i++) {
-        var v2 = valores[i];
-        if (v2 === null || v2 === undefined) continue;
-        mid = -Math.PI / 2 + (i + 0.5) * passo;
-        var rFill = R * v2 / 10;
-        var dentro = rFill >= 44; /* preenchimento fundo o bastante pro número caber dentro */
-        var rNum = dentro ? rFill - 15 : Math.max(rFill + 15, 24);
-        var pn = polar(cx, cy, rNum, mid);
-        var estilo = dentro
-          ? 'fill="#ffffff" stroke="rgba(11,11,11,0.4)" stroke-width="2.5" paint-order="stroke" stroke-linejoin="round"'
-          : 'fill="' + tema.ink + '"';
-        out.push('<text x="' + pn[0].toFixed(1) + '" y="' + (pn[1] + 5).toFixed(1) + '" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="14" font-weight="700" ' + estilo + '>' + (Math.round(v2 * 10) / 10) + '</text>');
+      if (opts.numeros) {
+        out.push('<text' + (opts.interativo ? ' id="barra-val-' + i + '"' : '') + ' x="' + (BW - padX) + '" y="' + (yTop + 16) + '" text-anchor="end" font-family="' + FONTE + '" font-size="15" font-weight="700" fill="' + (tem ? tema.ink : tema.muted) + '">' + (tem ? Math.round(v * 10) / 10 : '–') + '</text>');
       }
-    }
-
-    /* rótulos das competências */
-    if (comLabels) {
-      for (i = 0; i < N; i++) {
-        mid = -Math.PI / 2 + (i + 0.5) * passo;
-        var c = Math.cos(mid), s = Math.sin(mid);
-        var pl = polar(cx, cy, R + 20, mid);
-        var anchor = Math.abs(c) < 0.34 ? 'middle' : (c > 0 ? 'start' : 'end');
-        var linhas = quebraRotulo(COMPETENCIAS[i]);
-        var dy0 = s < -0.34 ? (linhas.length > 1 ? -14 : -2) : (s > 0.34 ? 8 : (linhas.length > 1 ? -6 : 2));
-        out.push('<text x="' + pl[0].toFixed(1) + '" y="' + (pl[1] + dy0).toFixed(1) + '" text-anchor="' + anchor + '" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12.5" font-weight="600" fill="' + tema.ink2 + '">');
-        for (var j = 0; j < linhas.length; j++) {
-          out.push('<tspan x="' + pl[0].toFixed(1) + '" dy="' + (j === 0 ? 0 : 14) + '">' + esc(linhas[j]) + '</tspan>');
+      out.push('<rect x="' + padX + '" y="' + yTr + '" width="' + trilhaW + '" height="' + trilhaH + '" rx="' + raio + '" fill="' + tema.grid + '" fill-opacity="' + (tema.escuro ? 0.8 : 0.5) + '"/>');
+      var wFill = !tem ? 0 : (v > 0 ? trilhaW * v / 10 : 6);
+      if (wFill || opts.interativo) {
+        out.push('<rect' + (opts.interativo ? ' id="barra-fill-' + i + '"' : '') + ' x="' + padX + '" y="' + yTr + '" width="' + wFill.toFixed(1) + '" height="' + trilhaH + '" rx="' + raio + '" fill="' + corSlot(i, tema) + '"/>');
+      }
+      if (!compacto) {
+        for (var t = 1; t <= 4; t++) {
+          var xT = padX + trilhaW * t / 5;
+          out.push('<line x1="' + xT + '" y1="' + yTr + '" x2="' + xT + '" y2="' + (yTr + trilhaH) + '" stroke="' + tema.surface + '" stroke-width="1.5"/>');
         }
-        out.push('</text>');
+      }
+      if (opts.interativo) {
+        out.push('<rect class="alvo" id="barra-alvo-' + i + '" data-i="' + i + '" x="0" y="' + yTop + '" width="' + BW + '" height="' + pitch + '" rx="8" fill="transparent" tabindex="0" role="slider" aria-label="' + esc(COMPETENCIAS[i]) + ', nota de 0 a 10" aria-valuemin="0" aria-valuemax="10"' + (tem ? ' aria-valuenow="' + v + '"' : '') + '/>');
       }
     }
     out.push('</svg>');
@@ -499,9 +425,9 @@
   function svgExport() {
     var hoje = new Date();
     var data = String(hoje.getDate()).padStart(2, '0') + '/' + String(hoje.getMonth() + 1).padStart(2, '0') + '/' + hoje.getFullYear();
-    return svgRoda({
+    return svgBarras({
       valores: estado.valores, tema: TEMA_CLARO, rotulos: true, numeros: true, fundo: true,
-      titulo: 'Roda das Competências', subtitulo: estado.nome + ' · ' + data
+      titulo: 'Gráfico de Competências', subtitulo: estado.nome + ' · ' + data
     });
   }
 
@@ -509,35 +435,20 @@
   function renderPreencher() {
     var completos = estado.valores.filter(function (v) { return v !== null; }).length;
     var pronto = completos === N && estado.nome.trim().length >= 2;
-    var linhas = COMPETENCIAS.map(function (nome, i) {
-      var cor = corSlot(i, temaAtual());
-      var botoes = '';
-      for (var v = 0; v <= 10; v++) {
-        var sel = estado.valores[i] === v;
-        botoes += '<button type="button" data-i="' + i + '" data-v="' + v + '" aria-pressed="' + sel + '" style="--marca:' + cor + '">' + v + '</button>';
-      }
-      return '<div class="linha-comp">' +
-        '<div class="comp-cab"><span class="chip" style="background:' + cor + '"></span>' +
-        '<span class="comp-nome">' + esc(nome) + '</span>' +
-        '<span class="comp-valor' + (estado.valores[i] !== null ? ' tem' : '') + '">' + (estado.valores[i] !== null ? estado.valores[i] : '–') + '</span></div>' +
-        '<div class="notas" role="group" aria-label="' + esc(nome) + ', nota de 0 a 10">' + botoes + '</div>' +
-        '</div>';
-    }).join('');
 
     app.className = 'wrap';
     app.innerHTML =
       '<header class="topo">' +
       '<div class="kicker">Autoavaliação</div>' +
-      '<h1>Roda das Competências</h1>' +
-      '<p class="sub">Toque na roda pra dar a nota, quanto mais longe do centro, maior (dá pra arrastar o dedo). Se preferir, use os números abaixo.</p>' +
+      '<h1>Gráfico de Competências</h1>' +
+      '<p class="sub">Toque na barra de cada competência pra marcar sua nota de 0 a 10 (dá pra arrastar o dedo).</p>' +
       '</header>' +
-      '<div class="palco interativa" id="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
+      '<div class="card grafico interativa" id="palco">' + svgBarras({ valores: estado.valores, rotulos: true, numeros: true, interativo: true }) + '</div>' +
       '<div class="card">' +
       '<label class="campo" for="nome">Seu nome</label>' +
       '<input type="text" id="nome" maxlength="40" autocomplete="name" placeholder="Como você quer aparecer" value="' + esc(estado.nome) + '">' +
       '</div>' +
-      '<div class="card">' + linhas + '</div>' +
-      '<button class="btn" id="enviar" ' + (pronto ? '' : 'disabled') + '>' + ICONES.enviar + (estado.enviado ? 'Reenviar minha roda' : 'Enviar minha roda') + '</button>' +
+      '<button class="btn" id="enviar" ' + (pronto ? '' : 'disabled') + '>' + ICONES.enviar + (estado.enviado ? 'Reenviar' : 'Enviar') + '</button>' +
       '<p class="progresso" id="progresso">' + completos + ' de ' + N + ' competências avaliadas</p>' +
       '<div class="rodape"><button class="link" id="ir-apresentar">Modo apresentador</button></div>';
 
@@ -547,56 +458,66 @@
       persistir();
     });
 
+    /* atualização em lugar (sem re-render): mantém foco e arrasto estáveis */
     function aplicarValor(i, v) {
       estado.valores[i] = v;
-      var grupo = app.querySelectorAll('.notas')[i];
-      if (grupo) {
-        grupo.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(+x.dataset.v === v)); });
-        var valorEl = grupo.previousElementSibling.querySelector('.comp-valor');
-        valorEl.textContent = v; valorEl.classList.add('tem');
-      }
-      document.getElementById('palco').innerHTML = svgRoda({ valores: estado.valores, rotulos: true, numeros: true });
+      var fill = document.getElementById('barra-fill-' + i);
+      var val = document.getElementById('barra-val-' + i);
+      var alvo = document.getElementById('barra-alvo-' + i);
+      if (fill) fill.setAttribute('width', (v > 0 ? BTRILHA_W * v / 10 : 6).toFixed(1));
+      if (val) { val.textContent = v; val.setAttribute('fill', temaAtual().ink); }
+      if (alvo) alvo.setAttribute('aria-valuenow', v);
       atualizarEnviar();
       persistir();
     }
 
-    app.querySelectorAll('.notas button').forEach(function (b) {
-      b.addEventListener('click', function () { aplicarValor(+b.dataset.i, +b.dataset.v); });
-    });
-
-    /* toque/arrasto direto na roda: setor = competência, distância do centro = nota */
     var palco = document.getElementById('palco');
-    var arrastando = false;
-    function notaDoToque(ev) {
+    var arrastandoBarra = -1;
+    function notaDoToque(ev, barraTravada) {
       var svg = palco.querySelector('svg');
       if (!svg) return null;
       var box = svg.getBoundingClientRect();
       if (!box.width || !box.height) return null;
-      var x = (ev.clientX - box.left) * (500 / box.width);
-      var y = (ev.clientY - box.top) * (500 / box.height);
-      var dx = x - 250, dy = y - 250;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 162) return null; /* fora da roda (rótulos ficam clicáveis sem efeito) */
-      var ang = Math.atan2(dy, dx) + Math.PI / 2;
-      if (ang < 0) ang += 2 * Math.PI;
-      var i = Math.min(N - 1, Math.floor(ang / (2 * Math.PI / N)));
-      return { i: i, v: Math.min(10, Math.round(dist / 150 * 10)) };
+      var vb = svg.viewBox.baseVal;
+      var x = (ev.clientX - box.left) * (vb.width / box.width);
+      var y = (ev.clientY - box.top) * (vb.height / box.height);
+      var i = barraTravada >= 0 ? barraTravada : Math.floor((y - BTOPO) / BPITCH);
+      if (i < 0 || i >= N) return null;
+      var v = Math.round((x - BPADX) / BTRILHA_W * 10);
+      if (v < 0) v = 0;
+      if (v > 10) v = 10;
+      return { i: i, v: v };
     }
     palco.addEventListener('pointerdown', function (e) {
-      var r = notaDoToque(e);
+      var r = notaDoToque(e, -1);
       if (!r) return;
-      arrastando = true;
+      arrastandoBarra = r.i;
       try { palco.setPointerCapture(e.pointerId); } catch (err) { /* navegador sem captura */ }
       e.preventDefault();
       aplicarValor(r.i, r.v);
     });
     palco.addEventListener('pointermove', function (e) {
-      if (!arrastando) return;
-      var r = notaDoToque(e);
+      if (arrastandoBarra < 0) return;
+      var r = notaDoToque(e, arrastandoBarra);
       if (r && estado.valores[r.i] !== r.v) aplicarValor(r.i, r.v);
     });
     ['pointerup', 'pointercancel'].forEach(function (t) {
-      palco.addEventListener(t, function () { arrastando = false; });
+      palco.addEventListener(t, function () { arrastandoBarra = -1; });
+    });
+    palco.addEventListener('keydown', function (e) {
+      var alvo = e.target;
+      if (!alvo || !alvo.dataset || alvo.dataset.i === undefined) return;
+      var i = +alvo.dataset.i;
+      var atual = estado.valores[i] === null ? 0 : estado.valores[i];
+      var v = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') v = Math.min(10, atual + 1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') v = Math.max(0, atual - 1);
+      else if (e.key === 'Home') v = 0;
+      else if (e.key === 'End') v = 10;
+      else if (/^[0-9]$/.test(e.key)) v = +e.key;
+      if (v === null) return;
+      e.preventDefault();
+      aplicarValor(i, v);
     });
 
     function atualizarEnviar() {
@@ -626,25 +547,25 @@
   function renderPronto() {
     app.className = 'wrap';
     var avisoSync = estado.sincronizado ? '' :
-      '<div class="aviso">' + ICONES.alerta + '<span>Sua roda ficou salva <b>neste aparelho</b>, mas não chegou ao painel do apresentador. Você pode tentar de novo ou compartilhar a imagem.</span></div>' +
+      '<div class="aviso">' + ICONES.alerta + '<span>Suas notas ficaram salvas <b>neste aparelho</b>, mas não chegaram ao painel do apresentador. Você pode tentar de novo ou compartilhar a imagem.</span></div>' +
       '<button class="btn fantasma" id="reenviar">Tentar enviar de novo</button>';
 
     app.innerHTML =
       '<header class="topo celebra">' +
-      '<span class="selo">' + ICONES.check + (estado.sincronizado ? 'Roda enviada' : 'Roda pronta') + '</span>' +
+      '<span class="selo">' + ICONES.check + (estado.sincronizado ? 'Enviado' : 'Pronto') + '</span>' +
       '<h1 style="margin-top:10px">' + esc(estado.nome) + '</h1>' +
-      '<p class="sub">Essa é a sua roda das competências de hoje.</p>' +
+      '<p class="sub">Esse é o seu gráfico de competências de hoje.</p>' +
       '</header>' +
-      '<div class="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
+      '<div class="card grafico">' + svgBarras({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
       avisoSync +
       '<button class="btn" id="compartilhar">' + ICONES.compartilhar + 'Compartilhar imagem</button>' +
       '<button class="btn fantasma" id="baixar">' + ICONES.baixar + 'Baixar imagem</button>' +
       '<button class="btn fantasma" id="editar">' + ICONES.editar + 'Ajustar minhas notas</button>' +
       '<div class="rodape"><button class="link" id="ir-apresentar">Modo apresentador</button></div>';
 
-    var nomeArq = 'roda-' + estado.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') + '.png';
+    var nomeArq = 'competencias-' + estado.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') + '.png';
     document.getElementById('compartilhar').addEventListener('click', function () {
-      compartilharPng(svgExport(), nomeArq, 'Minha Roda das Competências');
+      compartilharPng(svgExport(), nomeArq, 'Meu gráfico de competências');
     });
     document.getElementById('baixar').addEventListener('click', function () {
       baixarPng(svgExport(), nomeArq, 2);
@@ -699,7 +620,7 @@
     app.innerHTML =
       '<header class="topo">' +
       '<div class="kicker">Modo apresentador</div>' +
-      '<h1>Roda das Competências</h1>' +
+      '<h1>Gráfico de Competências</h1>' +
       '<p class="sub">Peça pra turma apontar a câmera pro QR e preencher no celular.</p>' +
       '</header>' +
       '<div class="apres-grid">' +
@@ -718,7 +639,7 @@
       '<div id="estado-servidor"></div>' +
       '</div>' +
       '<div id="media-bloco"></div>' +
-      '<div class="secao-titulo" id="titulo-individuais" hidden>Rodas individuais</div>' +
+      '<div class="secao-titulo" id="titulo-individuais" hidden>Por pessoa</div>' +
       '<div class="mini-grade" id="minis"></div>' +
       '</div>' +
       '</div>' +
@@ -747,7 +668,7 @@
         ctx.fillStyle = '#0b0b0b';
         for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr2.isDark(r, c)) ctx.fillRect(mg + c * cs, mg + r * cs, cs, cs);
         ctx.font = '700 34px system-ui, sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('Roda das Competências', tam / 2, tam + 30);
+        ctx.fillText('Gráfico de Competências', tam / 2, tam + 30);
         ctx.font = '400 24px system-ui, sans-serif'; ctx.fillStyle = '#52514e';
         ctx.fillText('Aponte a câmera e preencha', tam / 2, tam + 66);
         canvas.toBlob(function (png) {
@@ -793,7 +714,7 @@
     var tituloInd = document.getElementById('titulo-individuais');
 
     if (!pessoas.length) {
-      mediaBloco.innerHTML = '<div class="card"><p class="vazio">Nenhuma resposta ainda. Assim que alguém enviar, a roda média da turma aparece aqui ao vivo.</p></div>';
+      mediaBloco.innerHTML = '<div class="card"><p class="vazio">Nenhuma resposta ainda. Assim que alguém enviar, o gráfico médio da turma aparece aqui ao vivo.</p></div>';
       minis.innerHTML = '';
       tituloInd.hidden = true;
       return;
@@ -810,11 +731,11 @@
 
     mediaBloco.innerHTML =
       '<div class="secao-titulo">Média da turma</div>' +
-      '<div class="card palco">' + svgRoda({ valores: media, rotulos: true, numeros: true }) + '</div>';
+      '<div class="card grafico">' + svgBarras({ valores: media, rotulos: true, numeros: true }) + '</div>';
 
     tituloInd.hidden = false;
     minis.innerHTML = pessoas.map(function (p) {
-      return '<div class="mini">' + svgRoda({ valores: p.notas.valores, rotulos: false, numeros: false }) +
+      return '<div class="mini">' + svgBarras({ valores: p.notas.valores, compacto: true }) +
         '<div class="nome" title="' + esc(p.nome) + '">' + esc(p.nome) + '</div></div>';
     }).join('');
   }
