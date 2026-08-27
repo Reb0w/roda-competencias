@@ -82,6 +82,7 @@
     .palco::before { background: radial-gradient(closest-side at 50% 42%, rgba(57,135,229,0.13), transparent 72%); }
   }
   .palco svg { display: block; width: 100%; height: auto; position: relative; }
+  .palco.interativa svg { touch-action: none; cursor: pointer; }
 
   label.campo { display: block; font-size: 13px; font-weight: 600; color: var(--ink2); margin-bottom: 6px; }
   input[type="text"] {
@@ -528,9 +529,9 @@
       '<header class="topo">' +
       '<div class="kicker">Autoavaliação</div>' +
       '<h1>Roda das Competências</h1>' +
-      '<p class="sub">Dê uma nota de 0 a 10 pra cada competência. A sua roda se desenha sozinha.</p>' +
+      '<p class="sub">Toque na roda pra dar a nota, quanto mais longe do centro, maior (dá pra arrastar o dedo). Se preferir, use os números abaixo.</p>' +
       '</header>' +
-      '<div class="palco" id="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
+      '<div class="palco interativa" id="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
       '<div class="card">' +
       '<label class="campo" for="nome">Seu nome</label>' +
       '<input type="text" id="nome" maxlength="40" autocomplete="name" placeholder="Como você quer aparecer" value="' + esc(estado.nome) + '">' +
@@ -546,18 +547,56 @@
       persistir();
     });
 
-    app.querySelectorAll('.notas button').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var i = +b.dataset.i, v = +b.dataset.v;
-        estado.valores[i] = v;
-        var grupo = b.parentElement;
+    function aplicarValor(i, v) {
+      estado.valores[i] = v;
+      var grupo = app.querySelectorAll('.notas')[i];
+      if (grupo) {
         grupo.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(+x.dataset.v === v)); });
         var valorEl = grupo.previousElementSibling.querySelector('.comp-valor');
         valorEl.textContent = v; valorEl.classList.add('tem');
-        document.getElementById('palco').innerHTML = svgRoda({ valores: estado.valores, rotulos: true, numeros: true });
-        atualizarEnviar();
-        persistir();
-      });
+      }
+      document.getElementById('palco').innerHTML = svgRoda({ valores: estado.valores, rotulos: true, numeros: true });
+      atualizarEnviar();
+      persistir();
+    }
+
+    app.querySelectorAll('.notas button').forEach(function (b) {
+      b.addEventListener('click', function () { aplicarValor(+b.dataset.i, +b.dataset.v); });
+    });
+
+    /* toque/arrasto direto na roda: setor = competência, distância do centro = nota */
+    var palco = document.getElementById('palco');
+    var arrastando = false;
+    function notaDoToque(ev) {
+      var svg = palco.querySelector('svg');
+      if (!svg) return null;
+      var box = svg.getBoundingClientRect();
+      if (!box.width || !box.height) return null;
+      var x = (ev.clientX - box.left) * (500 / box.width);
+      var y = (ev.clientY - box.top) * (500 / box.height);
+      var dx = x - 250, dy = y - 250;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 162) return null; /* fora da roda (rótulos ficam clicáveis sem efeito) */
+      var ang = Math.atan2(dy, dx) + Math.PI / 2;
+      if (ang < 0) ang += 2 * Math.PI;
+      var i = Math.min(N - 1, Math.floor(ang / (2 * Math.PI / N)));
+      return { i: i, v: Math.min(10, Math.round(dist / 150 * 10)) };
+    }
+    palco.addEventListener('pointerdown', function (e) {
+      var r = notaDoToque(e);
+      if (!r) return;
+      arrastando = true;
+      try { palco.setPointerCapture(e.pointerId); } catch (err) { /* navegador sem captura */ }
+      e.preventDefault();
+      aplicarValor(r.i, r.v);
+    });
+    palco.addEventListener('pointermove', function (e) {
+      if (!arrastando) return;
+      var r = notaDoToque(e);
+      if (r && estado.valores[r.i] !== r.v) aplicarValor(r.i, r.v);
+    });
+    ['pointerup', 'pointercancel'].forEach(function (t) {
+      palco.addEventListener(t, function () { arrastando = false; });
     });
 
     function atualizarEnviar() {
