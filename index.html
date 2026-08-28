@@ -169,6 +169,57 @@
     transition: opacity 0.2s ease, transform 0.2s ease; max-width: 90vw; text-align: center;
   }
   .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---- sorteio de brindes ---- */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .chip {
+    border: 1px solid var(--baseline); background: var(--surface); color: var(--ink2);
+    font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 10px 14px; border-radius: 999px; cursor: pointer;
+  }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .lista-participantes { max-height: 42vh; overflow-y: auto; padding: 6px 16px; }
+  .participante {
+    display: flex; align-items: center; gap: 10px; padding: 11px 0;
+    border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .participante:last-child { border-bottom: none; }
+  .participante input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; margin: 0; }
+  .participante .p-nome { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .participante .p-hora { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
+  .participante.fora .p-nome { color: var(--muted); text-decoration: line-through; font-weight: 500; }
+  .stepper { display: flex; align-items: center; justify-content: center; gap: 18px; }
+  .stepper button {
+    width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--baseline);
+    background: var(--surface); color: var(--ink); font-size: 22px; font-weight: 700; cursor: pointer;
+    line-height: 1;
+  }
+  .stepper button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .stepper b { font-size: 40px; min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+  .roleta {
+    text-align: center; padding: 44px 14px 36px; min-height: 220px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  }
+  .roleta .nome-grande {
+    font-size: clamp(30px, 7vw, 62px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15;
+    overflow-wrap: anywhere; max-width: 100%;
+  }
+  .roleta.girando .nome-grande { color: var(--ink2); }
+  .roleta .festejo { font-size: 40px; line-height: 1; }
+  .linha-rank { display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-bottom: 1px solid var(--border); }
+  .linha-rank:last-child { border-bottom: none; }
+  .linha-rank .medalha { font-size: 26px; width: 44px; text-align: center; flex: none; }
+  .linha-rank .medalha.num { font-size: 17px; font-weight: 700; color: var(--muted); }
+  .linha-rank .r-nome { font-size: clamp(18px, 3.5vw, 26px); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+  .confete { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 50; }
+  .confete i {
+    position: absolute; top: -20px; width: 10px; height: 14px; border-radius: 2px;
+    animation: confete-cai linear forwards;
+  }
+  @keyframes confete-cai {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(115vh) rotate(720deg); opacity: 0.9; }
+  }
 </style>
 </head>
 <body>
@@ -369,14 +420,15 @@
   }
 
   function buscarRespostas() {
+    /* desc + reverse: se passar de 400 linhas, o corte joga fora as antigas, nunca as de hoje */
     var q = SUPA_URL + '/rest/v1/' + TABELA +
       '?sessao=eq.' + encodeURIComponent(SESSAO) +
-      '&select=nome,notas,criado_em&order=criado_em.asc&limit=400';
+      '&select=nome,notas,criado_em&order=criado_em.desc&limit=400';
     return fetch(q, { headers: cabecalhos }).then(function (r) {
       servidorOk = r.ok;
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
-    });
+    }).then(function (linhas) { return linhas.reverse(); });
   }
 
   /* última resposta por pessoa (uid; fallback nome) */
@@ -413,7 +465,8 @@
     atualizar: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>',
     alerta: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>',
     check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg>',
-    enviar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 14-7-4 14-3.5-5.5L5 12Z"/></svg>'
+    enviar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 14-7-4 14-3.5-5.5L5 12Z"/></svg>',
+    presente: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>'
   };
 
   /* ---------- export PNG ---------- */
@@ -671,6 +724,7 @@
       '<button class="btn fantasma" id="atualizar" style="width:auto;margin:0 0 0 auto;padding:8px 12px;font-size:13px">' + ICONES.atualizar + 'Atualizar</button></div>' +
       '<div id="estado-servidor"></div>' +
       '</div>' +
+      '<button class="btn" id="abrir-sorteio" disabled>' + ICONES.presente + 'Sortear brindes</button>' +
       '<div id="media-bloco"></div>' +
       '<div class="secao-titulo" id="titulo-individuais" hidden>Rodas individuais</div>' +
       '<div class="mini-grade" id="minis"></div>' +
@@ -716,6 +770,7 @@
     });
 
     document.getElementById('atualizar').addEventListener('click', function () { carregarPainel(true); });
+    document.getElementById('abrir-sorteio').addEventListener('click', abrirSorteio);
 
     carregarPainel(false);
     clearInterval(pollTimer);
@@ -726,12 +781,15 @@
 
   function carregarPainel(manual) {
     buscarRespostas().then(function (linhas) {
+      if (!document.getElementById('qtd')) return; /* saiu do painel antes da resposta chegar */
       var pessoas = deduplicar(linhas);
       pintarPainel(pessoas);
       if (manual) toast('Painel atualizado');
     }).catch(function () {
+      if (!document.getElementById('qtd')) return;
       document.getElementById('qtd').textContent = '–';
       document.getElementById('pulso').style.background = 'var(--warn-bord)';
+      document.getElementById('abrir-sorteio').disabled = true;
       document.getElementById('estado-servidor').innerHTML =
         '<div class="aviso">' + ICONES.alerta + '<span>O painel ao vivo ainda não está ligado (tabela não encontrada no banco). Cada pessoa ainda consegue preencher e compartilhar a própria imagem normalmente.</span></div>';
     });
@@ -740,6 +798,7 @@
   function pintarPainel(pessoas) {
     document.getElementById('qtd').textContent = pessoas.length;
     document.getElementById('pulso').style.background = 'var(--ok)';
+    document.getElementById('abrir-sorteio').disabled = !pessoas.length;
     document.getElementById('estado-servidor').innerHTML = '';
 
     var mediaBloco = document.getElementById('media-bloco');
@@ -773,8 +832,316 @@
     }).join('');
   }
 
+  /* ---------- sorteio de brindes ---------- */
+  var sorteio = null;
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function diaLocalIso(t) { var d = new Date(t); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function rotuloDia(iso) { return iso.slice(8, 10) + '/' + iso.slice(5, 7); }
+  function horaLocal(t) { var d = new Date(t); return pad2(d.getHours()) + 'h' + pad2(d.getMinutes()); }
+  function aleatorio(n) {
+    var b = new Uint32Array(1);
+    crypto.getRandomValues(b);
+    return b[0] % n;
+  }
+  function chavePessoa(p) { return (p.notas && p.notas.uid) || 'nome:' + String(p.nome).trim().toLowerCase(); }
+  function movimentoReduzido() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+  function abrirSorteio() {
+    clearInterval(pollTimer);
+    buscarRespostas().then(function (linhas) {
+      var validas = linhas.filter(function (l) { return l.notas && Array.isArray(l.notas.valores); });
+      var dias = {};
+      validas.forEach(function (l) { dias[diaLocalIso(l.criado_em)] = true; });
+      var listaDias = Object.keys(dias).sort().reverse();
+      var hoje = diaLocalIso(Date.now());
+      sorteio = {
+        linhas: validas,
+        dias: listaDias,
+        /* sem resposta hoje: cai no dia mais recente, nunca mistura dinamicas por padrao */
+        escopo: dias[hoje] ? hoje : (listaDias[0] || 'todas'),
+        excluidos: {},
+        qtd: 3,
+        vencedores: []
+      };
+      renderSorteioSetup();
+    }).catch(function () {
+      toast('Não deu pra buscar as respostas, tente de novo');
+      sorteio = null;
+      renderApresentar();
+    });
+  }
+
+  function participantesEscopo() {
+    var linhas = sorteio.linhas;
+    if (sorteio.escopo !== 'todas') {
+      linhas = linhas.filter(function (l) { return diaLocalIso(l.criado_em) === sorteio.escopo; });
+    }
+    return deduplicar(linhas);
+  }
+  function poolSorteio() {
+    return participantesEscopo().filter(function (p) { return !sorteio.excluidos[chavePessoa(p)]; });
+  }
+  function contarDia(diaIso) {
+    var linhas = diaIso === 'todas' ? sorteio.linhas :
+      sorteio.linhas.filter(function (l) { return diaLocalIso(l.criado_em) === diaIso; });
+    return deduplicar(linhas).length;
+  }
+  function escopoLabel() {
+    if (sorteio.escopo === 'todas') return 'Todos os dias';
+    return sorteio.escopo === diaLocalIso(Date.now()) ? 'Rodas de hoje' : 'Rodas de ' + rotuloDia(sorteio.escopo);
+  }
+
+  function renderSorteioSetup() {
+    var pessoas = participantesEscopo();
+    var pool = poolSorteio();
+    if (sorteio.qtd > pool.length) sorteio.qtd = Math.max(1, pool.length);
+    var hoje = diaLocalIso(Date.now());
+
+    var chips = '';
+    if (sorteio.dias.length > 1) {
+      sorteio.dias.forEach(function (d) {
+        chips += '<button class="chip' + (sorteio.escopo === d ? ' on' : '') + '" data-dia="' + d + '">' +
+          (d === hoje ? 'Hoje' : rotuloDia(d)) + ' · ' + contarDia(d) + '</button>';
+      });
+      chips += '<button class="chip' + (sorteio.escopo === 'todas' ? ' on' : '') + '" data-dia="todas">Todos os dias · ' + contarDia('todas') + '</button>';
+    }
+
+    var itens = pessoas.map(function (p, i) {
+      var fora = !!sorteio.excluidos[chavePessoa(p)];
+      return '<label class="participante' + (fora ? ' fora' : '') + '">' +
+        '<input type="checkbox" data-i="' + i + '"' + (fora ? '' : ' checked') + '>' +
+        '<span class="p-nome">' + esc(p.nome) + '</span>' +
+        '<span class="p-hora">' + horaLocal(p.criado_em) + '</span>' +
+        '</label>';
+    }).join('');
+
+    app.className = 'wrap';
+    app.innerHTML =
+      '<header class="topo">' +
+      '<div class="kicker">Modo apresentador</div>' +
+      '<h1>Sorteio de brindes</h1>' +
+      '<p class="sub">Só entra quem preencheu a roda e enviou.</p>' +
+      '</header>' +
+      (chips ? '<div class="secao-titulo">Rodas de quando?</div><div class="chips">' + chips + '</div>' : '') +
+      '<div class="secao-titulo" style="display:flex;align-items:center;gap:8px">' +
+      '<span>Participantes · <span id="qtd-pool">' + pool.length + '</span> no sorteio</span>' +
+      '<button class="btn fantasma" id="atualizar-lista" style="width:auto;margin:0 0 0 auto;padding:6px 10px;font-size:12px">' + ICONES.atualizar + 'Atualizar</button>' +
+      '</div>' +
+      '<div class="card lista-participantes" id="lista-part">' +
+      (itens || '<p class="vazio">Ninguém enviou nesse dia ainda.</p>') +
+      '</div>' +
+      '<div class="secao-titulo">Quantos brindes?</div>' +
+      '<div class="card stepper">' +
+      '<button id="menos" aria-label="Menos um brinde"' + (sorteio.qtd <= 1 ? ' disabled' : '') + '>−</button>' +
+      '<b id="qtd-brindes">' + sorteio.qtd + '</b>' +
+      '<button id="mais" aria-label="Mais um brinde"' + (sorteio.qtd >= pool.length ? ' disabled' : '') + '>+</button>' +
+      '</div>' +
+      '<button class="btn" id="comecar"' + (pool.length ? '' : ' disabled') + '>' + ICONES.presente + 'Sortear agora</button>' +
+      '<div class="rodape"><button class="link" id="voltar-painel">Voltar ao painel</button></div>';
+
+    Array.prototype.forEach.call(app.querySelectorAll('.chip'), function (ch) {
+      ch.addEventListener('click', function () {
+        sorteio.escopo = ch.getAttribute('data-dia');
+        renderSorteioSetup();
+      });
+    });
+
+    document.getElementById('atualizar-lista').addEventListener('click', function () {
+      buscarRespostas().then(function (linhas) {
+        var validas = linhas.filter(function (l) { return l.notas && Array.isArray(l.notas.valores); });
+        var dias = {};
+        validas.forEach(function (l) { dias[diaLocalIso(l.criado_em)] = true; });
+        sorteio.linhas = validas;
+        sorteio.dias = Object.keys(dias).sort().reverse();
+        if (sorteio.escopo !== 'todas' && !dias[sorteio.escopo]) sorteio.escopo = sorteio.dias[0] || 'todas';
+        renderSorteioSetup();
+        toast('Lista atualizada');
+      }).catch(function () { toast('Não deu pra atualizar, tente de novo'); });
+    });
+
+    var lista = document.getElementById('lista-part');
+    lista.addEventListener('change', function (e) {
+      var cb = e.target;
+      if (cb.tagName !== 'INPUT') return;
+      var p = pessoas[Number(cb.getAttribute('data-i'))];
+      if (!p) return;
+      if (cb.checked) delete sorteio.excluidos[chavePessoa(p)];
+      else sorteio.excluidos[chavePessoa(p)] = true;
+      var rolagem = lista.scrollTop;
+      renderSorteioSetup();
+      document.getElementById('lista-part').scrollTop = rolagem;
+    });
+
+    document.getElementById('menos').addEventListener('click', function () {
+      sorteio.qtd = Math.max(1, sorteio.qtd - 1);
+      renderSorteioSetup();
+    });
+    document.getElementById('mais').addEventListener('click', function () {
+      sorteio.qtd = Math.min(poolSorteio().length, sorteio.qtd + 1);
+      renderSorteioSetup();
+    });
+    document.getElementById('comecar').addEventListener('click', function () {
+      sorteio.vencedores = [];
+      renderSorteioRodada();
+    });
+    document.getElementById('voltar-painel').addEventListener('click', function () {
+      sorteio = null;
+      renderApresentar();
+    });
+  }
+
+  function renderSorteioRodada() {
+    var n = sorteio.vencedores.length + 1;
+    var pool = poolSorteio().filter(function (p) {
+      return !sorteio.vencedores.some(function (v) { return chavePessoa(v) === chavePessoa(p); });
+    });
+    if (!pool.length) { renderSorteioFinal(); return; }
+    var vencedor = pool[aleatorio(pool.length)];
+
+    app.className = 'wrap';
+    app.innerHTML =
+      '<header class="topo">' +
+      '<div class="kicker">' + n + 'º brinde' + (sorteio.qtd > 1 ? ' de ' + sorteio.qtd : '') + '</div>' +
+      '<h1>E o brinde vai pra...</h1>' +
+      '</header>' +
+      '<div class="card roleta girando" id="roleta">' +
+      '<div class="festejo" id="festejo" hidden>🎉</div>' +
+      '<div class="nome-grande" id="nome-roleta">...</div>' +
+      '</div>' +
+      '<div id="pos-sorteio" hidden>' +
+      '<button class="btn" id="proximo"></button>' +
+      '<button class="btn fantasma" id="refazer">Não está aqui? Sortear este de novo</button>' +
+      '</div>';
+
+    var el = document.getElementById('nome-roleta');
+    var atraso = 60;
+    var ultimo = -1;
+
+    function girar() {
+      if (!document.getElementById('nome-roleta')) return; /* saiu da tela no meio do giro */
+      var i;
+      do { i = aleatorio(pool.length); } while (pool.length > 1 && i === ultimo);
+      ultimo = i;
+      el.textContent = pool[i].nome;
+      atraso *= 1.14;
+      if (atraso < 380) setTimeout(girar, atraso);
+      else setTimeout(revelar, atraso);
+    }
+    function revelar() {
+      if (!document.getElementById('nome-roleta')) return;
+      document.getElementById('roleta').classList.remove('girando');
+      el.textContent = vencedor.nome;
+      document.getElementById('festejo').hidden = false;
+      confete();
+      sorteio.vencedores.push(vencedor);
+      var falta = sorteio.vencedores.length < sorteio.qtd;
+      var btn = document.getElementById('proximo');
+      btn.innerHTML = falta ? ICONES.presente + 'Sortear o próximo brinde' : ICONES.check + 'Ver o resultado';
+      btn.addEventListener('click', function () {
+        if (sorteio.vencedores.length < sorteio.qtd) renderSorteioRodada();
+        else renderSorteioFinal();
+      });
+      document.getElementById('refazer').addEventListener('click', function () {
+        sorteio.excluidos[chavePessoa(vencedor)] = true;
+        sorteio.vencedores.pop();
+        renderSorteioRodada();
+      });
+      document.getElementById('pos-sorteio').hidden = false;
+    }
+
+    if (movimentoReduzido() || pool.length === 1) setTimeout(revelar, 500);
+    else girar();
+  }
+
+  function renderSorteioFinal() {
+    var medalhas = ['🥇', '🥈', '🥉'];
+    var linhas = sorteio.vencedores.map(function (v, i) {
+      var medalha = medalhas[i]
+        ? '<span class="medalha">' + medalhas[i] + '</span>'
+        : '<span class="medalha num">' + (i + 1) + 'º</span>';
+      return '<div class="linha-rank">' + medalha + '<span class="r-nome">' + esc(v.nome) + '</span></div>';
+    }).join('');
+
+    app.className = 'wrap';
+    app.innerHTML =
+      '<header class="topo celebra">' +
+      '<span class="selo">' + ICONES.check + 'Sorteio concluído</span>' +
+      '<h1 style="margin-top:10px">Ganhadores</h1>' +
+      '<p class="sub">' + escopoLabel() + ' · ' + sorteio.vencedores.length +
+      (sorteio.vencedores.length === 1 ? ' brinde sorteado' : ' brindes sorteados') + '</p>' +
+      '</header>' +
+      '<div class="card">' + (linhas || '<p class="vazio">Ninguém foi sorteado.</p>') + '</div>' +
+      (sorteio.vencedores.length ? '<button class="btn" id="baixar-resultado">' + ICONES.baixar + 'Baixar resultado</button>' : '') +
+      '<button class="btn fantasma" id="denovo">Sortear tudo de novo</button>' +
+      '<div class="rodape"><button class="link" id="voltar-painel">Voltar ao painel</button></div>';
+
+    var baixar = document.getElementById('baixar-resultado');
+    if (baixar) baixar.addEventListener('click', baixarResultadoSorteio);
+    document.getElementById('denovo').addEventListener('click', function () {
+      sorteio.vencedores = [];
+      renderSorteioSetup();
+    });
+    document.getElementById('voltar-painel').addEventListener('click', function () {
+      sorteio = null;
+      renderApresentar();
+    });
+  }
+
+  function baixarResultadoSorteio() {
+    var medalhas = ['🥇', '🥈', '🥉'];
+    var hoje = new Date();
+    var data = pad2(hoje.getDate()) + '/' + pad2(hoje.getMonth() + 1) + '/' + hoje.getFullYear();
+    var linhaAltura = 64, topo = 150;
+    var L = 900, A = topo + sorteio.vencedores.length * linhaAltura + 40;
+    var canvas = document.createElement('canvas');
+    canvas.width = L * 2; canvas.height = A * 2;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+    ctx.fillStyle = '#fcfcfb'; ctx.fillRect(0, 0, L, A);
+    ctx.fillStyle = '#0b0b0b';
+    ctx.font = '800 34px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Sorteio de brindes', L / 2, 56);
+    ctx.font = '400 18px system-ui, sans-serif'; ctx.fillStyle = '#52514e';
+    ctx.fillText('Roda das Competências · ' + escopoLabel() + ' · ' + data, L / 2, 88);
+    ctx.textAlign = 'left';
+    sorteio.vencedores.forEach(function (v, i) {
+      var y = topo + i * linhaAltura;
+      ctx.font = '400 30px system-ui, sans-serif'; ctx.fillStyle = '#0b0b0b';
+      ctx.fillText(medalhas[i] || (i + 1) + 'º', 60, y);
+      ctx.font = '700 30px system-ui, sans-serif';
+      ctx.fillText(String(v.nome).slice(0, 40), 130, y);
+    });
+    canvas.toBlob(function (png) {
+      if (!png) { toast('Não deu pra gerar a imagem'); return; }
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(png);
+      a.download = 'sorteio-roda-das-competencias.png';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+      toast('Resultado salvo nos downloads');
+    }, 'image/png');
+  }
+
+  function confete() {
+    if (movimentoReduzido()) return;
+    var caixa = document.createElement('div');
+    caixa.className = 'confete';
+    var cores = temaAtual().slots;
+    var html = '';
+    for (var i = 0; i < 60; i++) {
+      html += '<i style="left:' + (Math.random() * 100).toFixed(1) + 'vw;background:' + cores[i % cores.length] +
+        ';animation-duration:' + (1.6 + Math.random() * 1.4).toFixed(2) + 's;animation-delay:' + (Math.random() * 0.3).toFixed(2) + 's"></i>';
+    }
+    caixa.innerHTML = html;
+    document.body.appendChild(caixa);
+    setTimeout(function () { caixa.remove(); }, 3600);
+  }
+
   /* ---------- boot ---------- */
   mqEscuro.addEventListener('change', function () {
+    if (sorteio) return; /* telas do sorteio usam só tokens de CSS, sem re-render */
     if (MODO_APRESENTAR) renderApresentar();
     else if (estado.enviado && !estado.editando) renderPronto();
     else renderPreencher();
