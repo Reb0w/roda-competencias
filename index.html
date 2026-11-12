@@ -112,6 +112,14 @@
     font-size: 13px; color: var(--ink2); display: flex; gap: 8px; align-items: flex-start;
   }
   .aviso svg { flex: none; margin-top: 2px; }
+  .rodada-barra { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px; margin: 4px 0 14px; font-size: 14px; color: var(--ink2); }
+  .rodada-barra b { color: var(--ink); }
+  .rodada-barra select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--baseline); background: var(--surface); color: var(--ink); max-width: 100%; }
+  .btn.mini { width: auto; margin: 0; padding: 7px 12px; font-size: 13px; }
+  .confirma { margin: 0 0 14px; }
+  .confirma p { margin: 0 0 10px; font-size: 14px; color: var(--ink2); }
+  .confirma .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .p-ganhou { font-size: 12px; color: var(--warn-bord); font-weight: 600; margin-left: 6px; }
 
   .progresso { font-size: 13px; color: var(--muted); text-align: center; margin-top: 10px; font-variant-numeric: tabular-nums; }
 
@@ -205,6 +213,12 @@
     overflow-wrap: anywhere; max-width: 100%;
   }
   .roleta.girando .nome-grande { color: var(--ink2); }
+  .codigo-grande { margin-top: 6px; font-size: 18px; font-weight: 700; letter-spacing: .12em; color: var(--accent); min-height: 1.4em; font-variant-numeric: tabular-nums; }
+  .codigo-sorteio { text-align: center; }
+  .codigo-sorteio span { display: block; font-size: 13px; color: var(--muted); }
+  .codigo-sorteio b { display: block; font-size: 34px; letter-spacing: .16em; margin: 2px 0; color: var(--ink); }
+  .codigo-sorteio small { display: block; font-size: 12.5px; color: var(--ink2); }
+  .r-cod { font-size: 13px; font-weight: 600; letter-spacing: .1em; color: var(--muted); margin-left: auto; }
   .roleta .festejo { font-size: 40px; line-height: 1; }
   .linha-rank { display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-bottom: 1px solid var(--border); }
   .linha-rank:last-child { border-bottom: none; }
@@ -250,6 +264,8 @@
   }
   var N = COMPETENCIAS.length;
   var SESSAO = (params.get('s') || 'geral').slice(0, 60);
+  /* rodadas que este aparelho já abriu como apresentador (pra voltar a uma anterior) */
+  var LS_RODADAS = 'roda:rodadas';
   var MODO_APRESENTAR = params.get('modo') === 'apresentar';
 
   /* paleta categórica validada (ordem fixa, claro/escuro) */
@@ -273,6 +289,23 @@
     if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('roda:uid', uid); }
   } catch (e) { uid = 'u' + Math.random().toString(36).slice(2, 10); }
 
+  /* código do sorteio: 4 letras e números tirados do aparelho (quem não põe o
+     nome, ou põe um apelido, mostra o código se ganhar) */
+  var ALFA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function codigoDe(id) {
+    var h = 2166136261;
+    for (var i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    var c = '';
+    for (var k = 0; k < 4; k++) { c += ALFA[h % 32]; h = Math.floor(h / 32); }
+    return c;
+  }
+  var CODIGO = codigoDe(uid);
+  function codigoDaPessoa(p) {
+    var n = p && p.notas;
+    if (n && typeof n.codigo === 'string') return n.codigo;
+    return n && n.uid ? codigoDe(String(n.uid)) : '';
+  }
+
   var estado = {
     nome: salvo ? salvo.nome : '',
     valores: salvo ? salvo.valores.slice() : new Array(N).fill(null),
@@ -280,6 +313,11 @@
     sincronizado: !!(salvo && salvo.sincronizado),
     editando: false
   };
+
+  function nomeVisivel() {
+    var n = String(estado.nome || '').trim().slice(0, 40);
+    return n.length >= 2 ? n : 'Participante ' + CODIGO;
+  }
 
   function persistir() {
     try {
@@ -408,8 +446,8 @@
   function enviarResposta() {
     var corpo = JSON.stringify({
       sessao: SESSAO,
-      nome: estado.nome,
-      notas: { uid: uid, competencias: COMPETENCIAS, valores: estado.valores }
+      nome: nomeVisivel(),
+      notas: { uid: uid, codigo: CODIGO, competencias: COMPETENCIAS, valores: estado.valores }
     });
     return fetch(SUPA_URL + '/rest/v1/' + TABELA, {
       method: 'POST', headers: cabecalhos, body: corpo
@@ -533,14 +571,14 @@
     var data = String(hoje.getDate()).padStart(2, '0') + '/' + String(hoje.getMonth() + 1).padStart(2, '0') + '/' + hoje.getFullYear();
     return svgRoda({
       valores: estado.valores, tema: TEMA_CLARO, rotulos: true, numeros: true, fundo: true,
-      titulo: 'Roda das Competências', subtitulo: estado.nome + ' · ' + data
+      titulo: 'Roda das Competências', subtitulo: nomeVisivel() + ' · ' + data
     });
   }
 
   /* ---------- tela: preencher ---------- */
   function renderPreencher() {
     var completos = estado.valores.filter(function (v) { return v !== null; }).length;
-    var pronto = completos === N && estado.nome.trim().length >= 2;
+    var pronto = completos === N;
 
     app.className = 'wrap';
     app.innerHTML =
@@ -551,8 +589,8 @@
       '</header>' +
       '<div class="palco interativa" id="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
       '<div class="card">' +
-      '<label class="campo" for="nome">Seu nome</label>' +
-      '<input type="text" id="nome" maxlength="40" autocomplete="name" placeholder="Como você quer aparecer" value="' + esc(estado.nome) + '">' +
+      '<label class="campo" for="nome">Seu nome (opcional)</label>' +
+      '<input type="text" id="nome" maxlength="40" autocomplete="given-name" placeholder="Pode ser só o primeiro nome" value="' + esc(estado.nome) + '">' +
       '</div>' +
       '<button class="btn" id="enviar" ' + (pronto ? '' : 'disabled') + '>' + ICONES.enviar + (estado.enviado ? 'Reenviar' : 'Enviar') + '</button>' +
       '<p class="progresso" id="progresso">' + completos + ' de ' + N + ' competências avaliadas</p>' +
@@ -609,7 +647,7 @@
     function atualizarEnviar() {
       var c = estado.valores.filter(function (x) { return x !== null; }).length;
       document.getElementById('progresso').textContent = c + ' de ' + N + ' competências avaliadas';
-      document.getElementById('enviar').disabled = !(c === N && estado.nome.trim().length >= 2);
+      document.getElementById('enviar').disabled = c !== N;
     }
 
     document.getElementById('enviar').addEventListener('click', function () {
@@ -639,17 +677,18 @@
     app.innerHTML =
       '<header class="topo celebra">' +
       '<span class="selo">' + ICONES.check + (estado.sincronizado ? 'Roda enviada' : 'Roda pronta') + '</span>' +
-      '<h1 style="margin-top:10px">' + esc(estado.nome) + '</h1>' +
+      '<h1 style="margin-top:10px">' + esc(nomeVisivel()) + '</h1>' +
       '<p class="sub">Essa é a sua roda das competências de hoje.</p>' +
       '</header>' +
       '<div class="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
+      '<div class="card codigo-sorteio"><span>Seu código do sorteio</span><b>' + CODIGO + '</b><small>Se for sorteado, mostre este código.</small></div>' +
       avisoSync +
       '<button class="btn" id="compartilhar">' + ICONES.compartilhar + 'Compartilhar imagem</button>' +
       '<button class="btn fantasma" id="baixar">' + ICONES.baixar + 'Baixar imagem</button>' +
       '<button class="btn fantasma" id="editar">' + ICONES.editar + 'Ajustar minhas notas</button>' +
       '<div class="rodape"><button class="link" id="ir-apresentar">Modo apresentador</button></div>';
 
-    var nomeArq = 'roda-' + estado.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') + '.png';
+    var nomeArq = 'roda-' + nomeVisivel().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') + '.png';
     document.getElementById('compartilhar').addEventListener('click', function () {
       compartilharPng(svgExport(), nomeArq, 'Minha Roda das Competências');
     });
@@ -689,7 +728,44 @@
     return u.toString();
   }
 
+  function rotuloRodada(s) {
+    var m = /^r(\d{2})(\d{2})(\d{2})-(\d{2})(\d{2})$/.exec(s);
+    if (m) return 'Rodada de ' + m[3] + '/' + m[2] + ' às ' + m[4] + 'h' + m[5];
+    return s === 'geral' ? 'Rodada geral' : 'Rodada "' + s + '"';
+  }
+  function lerRodadas() {
+    try { var l = JSON.parse(localStorage.getItem(LS_RODADAS) || '[]'); return Array.isArray(l) ? l.filter(function (x) { return typeof x === 'string'; }) : []; } catch (e) { return []; }
+  }
+  function lembrarRodada(s) {
+    var l = lerRodadas().filter(function (x) { return x !== s; });
+    l.unshift(s);
+    try { localStorage.setItem(LS_RODADAS, JSON.stringify(l.slice(0, 20))); } catch (e) { /* sem storage */ }
+  }
+  function irParaRodada(s) {
+    SESSAO = s.slice(0, 60);
+    var u = new URL(location.href);
+    if (SESSAO === 'geral') u.searchParams.delete('s'); else u.searchParams.set('s', SESSAO);
+    try { history.replaceState(null, '', u.toString()); } catch (e) { /* segue sem trocar o endereço */ }
+    sorteio = null;
+    renderApresentar();
+  }
+  function novaRodadaId() {
+    var d = new Date();
+    return 'r' + String(d.getFullYear()).slice(2) + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + pad2(d.getHours()) + pad2(d.getMinutes());
+  }
+  /* quem já ganhou em um sorteio desta rodada (neste aparelho) */
+  function chaveGanhadores() { return 'roda:ganhadores:' + SESSAO; }
+  function lerGanhadores() {
+    try { var o = JSON.parse(localStorage.getItem(chaveGanhadores()) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; }
+  }
+  function guardarGanhadores(vencedores) {
+    var o = lerGanhadores();
+    vencedores.forEach(function (v) { o[chavePessoa(v)] = v.nome; });
+    try { localStorage.setItem(chaveGanhadores(), JSON.stringify(o)); } catch (e) { /* sem storage */ }
+  }
+
   function renderApresentar() {
+    lembrarRodada(SESSAO);
     var link = urlPreencher();
     var qrSvg = '';
     try {
@@ -709,6 +785,7 @@
       '<h1>Roda das Competências</h1>' +
       '<p class="sub">Peça pra turma apontar a câmera pro QR e preencher no celular.</p>' +
       '</header>' +
+      barraRodada() +
       '<div class="apres-grid">' +
       '<div class="card qr-box">' +
       '<div class="qr-svg" id="qr">' + qrSvg + '</div>' +
@@ -771,12 +848,38 @@
 
     document.getElementById('atualizar').addEventListener('click', function () { carregarPainel(true); });
     document.getElementById('abrir-sorteio').addEventListener('click', abrirSorteio);
+    ligarBarraRodada();
 
     carregarPainel(false);
     clearInterval(pollTimer);
     pollTimer = setInterval(function () {
       if (!document.hidden) carregarPainel(false);
     }, 5000);
+  }
+
+  function barraRodada() {
+    var outras = lerRodadas().filter(function (x) { return x !== SESSAO; });
+    var sel = outras.length
+      ? '<select id="rodada-anterior" aria-label="Voltar a uma rodada anterior"><option value="">Voltar a uma rodada anterior…</option>' +
+        outras.map(function (x) { return '<option value="' + esc(x) + '">' + esc(rotuloRodada(x)) + '</option>'; }).join('') + '</select>'
+      : '';
+    return '<div class="rodada-barra"><span><b>' + esc(rotuloRodada(SESSAO)) + '</b></span>' +
+      '<button class="btn fantasma mini" id="nova-rodada">Começar rodada nova</button>' + sel + '</div>' +
+      '<div class="card confirma" id="confirma-rodada" hidden>' +
+      '<p>Na rodada nova, o QR e o link mudam. Quem respondeu antes não aparece no painel nem entra no sorteio. As respostas de antes continuam guardadas, e dá pra voltar a esta rodada pela lista ao lado do botão.</p>' +
+      '<div class="acoes"><button class="btn mini" id="confirma-sim">Começar rodada nova</button>' +
+      '<button class="btn fantasma mini" id="confirma-nao">Cancelar</button></div></div>';
+  }
+  function ligarBarraRodada() {
+    var caixa = document.getElementById('confirma-rodada');
+    document.getElementById('nova-rodada').addEventListener('click', function () { caixa.hidden = false; });
+    document.getElementById('confirma-nao').addEventListener('click', function () { caixa.hidden = true; });
+    document.getElementById('confirma-sim').addEventListener('click', function () {
+      irParaRodada(novaRodadaId());
+      toast('Rodada nova: mostre o QR novo');
+    });
+    var sel = document.getElementById('rodada-anterior');
+    if (sel) sel.addEventListener('change', function () { if (sel.value) irParaRodada(sel.value); });
   }
 
   function carregarPainel(manual) {
@@ -860,7 +963,9 @@
         dias: listaDias,
         /* sem resposta hoje: cai no dia mais recente, nunca mistura dinamicas por padrao */
         escopo: dias[hoje] ? hoje : (listaDias[0] || 'todas'),
-        excluidos: {},
+        /* quem já ganhou um brinde nesta rodada começa fora (dá pra marcar de novo) */
+        excluidos: (function () { var g = lerGanhadores(), o = {}; for (var k in g) o[k] = true; return o; })(),
+        ganhadores: lerGanhadores(),
         qtd: 3,
         vencedores: []
       };
@@ -911,8 +1016,8 @@
       var fora = !!sorteio.excluidos[chavePessoa(p)];
       return '<label class="participante' + (fora ? ' fora' : '') + '">' +
         '<input type="checkbox" data-i="' + i + '"' + (fora ? '' : ' checked') + '>' +
-        '<span class="p-nome">' + esc(p.nome) + '</span>' +
-        '<span class="p-hora">' + horaLocal(p.criado_em) + '</span>' +
+        '<span class="p-nome">' + esc(p.nome) + (sorteio.ganhadores && sorteio.ganhadores[chavePessoa(p)] ? '<span class="p-ganhou">já ganhou</span>' : '') + '</span>' +
+        '<span class="p-hora">' + esc(codigoDaPessoa(p)) + ' · ' + horaLocal(p.criado_em) + '</span>' +
         '</label>';
     }).join('');
 
@@ -921,7 +1026,7 @@
       '<header class="topo">' +
       '<div class="kicker">Modo apresentador</div>' +
       '<h1>Sorteio de brindes</h1>' +
-      '<p class="sub">Só entra quem preencheu a roda e enviou.</p>' +
+      '<p class="sub">Só entra quem preencheu a roda e enviou nesta rodada. Desmarque quem não está na sala.</p>' +
       '</header>' +
       (chips ? '<div class="secao-titulo">Rodas de quando?</div><div class="chips">' + chips + '</div>' : '') +
       '<div class="secao-titulo" style="display:flex;align-items:center;gap:8px">' +
@@ -1008,6 +1113,7 @@
       '<div class="card roleta girando" id="roleta">' +
       '<div class="festejo" id="festejo" hidden>🎉</div>' +
       '<div class="nome-grande" id="nome-roleta">...</div>' +
+      '<div class="codigo-grande" id="codigo-roleta"></div>' +
       '</div>' +
       '<div id="pos-sorteio" hidden>' +
       '<button class="btn" id="proximo"></button>' +
@@ -1032,6 +1138,8 @@
       if (!document.getElementById('nome-roleta')) return;
       document.getElementById('roleta').classList.remove('girando');
       el.textContent = vencedor.nome;
+      var cod = codigoDaPessoa(vencedor);
+      document.getElementById('codigo-roleta').textContent = cod ? 'Código ' + cod : '';
       document.getElementById('festejo').hidden = false;
       confete();
       sorteio.vencedores.push(vencedor);
@@ -1055,12 +1163,13 @@
   }
 
   function renderSorteioFinal() {
+    guardarGanhadores(sorteio.vencedores);
     var medalhas = ['🥇', '🥈', '🥉'];
     var linhas = sorteio.vencedores.map(function (v, i) {
       var medalha = medalhas[i]
         ? '<span class="medalha">' + medalhas[i] + '</span>'
         : '<span class="medalha num">' + (i + 1) + 'º</span>';
-      return '<div class="linha-rank">' + medalha + '<span class="r-nome">' + esc(v.nome) + '</span></div>';
+      return '<div class="linha-rank">' + medalha + '<span class="r-nome">' + esc(v.nome) + '</span><span class="r-cod">' + esc(codigoDaPessoa(v)) + '</span></div>';
     }).join('');
 
     app.className = 'wrap';
@@ -1079,6 +1188,10 @@
     var baixar = document.getElementById('baixar-resultado');
     if (baixar) baixar.addEventListener('click', baixarResultadoSorteio);
     document.getElementById('denovo').addEventListener('click', function () {
+      /* "tudo de novo": os ganhadores deste sorteio voltam a concorrer */
+      var g = lerGanhadores();
+      sorteio.vencedores.forEach(function (v) { delete g[chavePessoa(v)]; delete sorteio.excluidos[chavePessoa(v)]; delete sorteio.ganhadores[chavePessoa(v)]; });
+      try { localStorage.setItem(chaveGanhadores(), JSON.stringify(g)); } catch (e) { /* sem storage */ }
       sorteio.vencedores = [];
       renderSorteioSetup();
     });
@@ -1110,7 +1223,7 @@
       ctx.font = '400 30px system-ui, sans-serif'; ctx.fillStyle = '#0b0b0b';
       ctx.fillText(medalhas[i] || (i + 1) + 'º', 60, y);
       ctx.font = '700 30px system-ui, sans-serif';
-      ctx.fillText(String(v.nome).slice(0, 40), 130, y);
+      ctx.fillText(String(v.nome).slice(0, 40) + (codigoDaPessoa(v) ? '  ·  ' + codigoDaPessoa(v) : ''), 130, y);
     });
     canvas.toBlob(function (png) {
       if (!png) { toast('Não deu pra gerar a imagem'); return; }

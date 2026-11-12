@@ -1,6 +1,7 @@
--- Roda das Competências · tabela de respostas
--- Colar UMA vez no SQL Editor do Supabase (projeto tqtkjmdkmtqgjcchonax).
--- Sem ela, o Enviar dos colegas não chega ao painel (fica só no aparelho).
+-- Roda das Competências (reb0w.github.io/roda-competencias): recria a tabela
+-- das respostas, apagada em 14-10. Pedido do founder em 12-11, pra apresentação
+-- do trabalho de 13-11. Pode colar mais de uma vez sem estragar nada.
+-- Projeto Supabase: tqtkjmdkmtqgjcchonax (o mesmo do Quizinho).
 
 create table if not exists public.roda_respostas (
   id bigint generated always as identity primary key,
@@ -12,16 +13,21 @@ create table if not exists public.roda_respostas (
 
 alter table public.roda_respostas enable row level security;
 
--- a chave pública do site só INSERE (quem preenche) e LÊ (painel do apresentador);
--- sem policy de update/delete, ninguém altera ou apaga resposta pela chave pública
+-- A chave pública do site só INSERE (quem preenche) e LÊ (painel do
+-- apresentador). Sem policy de update ou delete: ninguém altera nem apaga
+-- resposta pela chave pública.
+drop policy if exists roda_respostas_inserir on public.roda_respostas;
 create policy roda_respostas_inserir on public.roda_respostas
   for insert to anon, authenticated
   with check (true);
 
+drop policy if exists roda_respostas_ler on public.roda_respostas;
 create policy roda_respostas_ler on public.roda_respostas
   for select to anon, authenticated
   using (true);
 
--- o painel filtra por sessao e ordena/agrupa por criado_em (sorteio por dia)
+grant select, insert on public.roda_respostas to anon, authenticated;
+
+-- O painel filtra pela rodada (sessao) e ordena pela hora.
 create index if not exists roda_respostas_sessao_criado_idx
   on public.roda_respostas (sessao, criado_em);
