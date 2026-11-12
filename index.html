@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Roda das Competências</title>
-<meta name="description" content="Avalie suas competências de 0 a 10 e veja sua roda.">
-<meta property="og:title" content="Roda das Competências">
-<meta property="og:description" content="Escaneie, avalie suas competências de 0 a 10 e veja sua roda na hora.">
+<title>Gráfico das Competências</title>
+<meta name="description" content="Dê uma nota de 0 a 10 pra cada competência e veja o seu gráfico.">
+<meta property="og:title" content="Gráfico das Competências">
+<meta property="og:description" content="Aponte a câmera, dê suas notas de 0 a 10 e veja o seu gráfico na hora.">
 <style>
   :root {
     color-scheme: light;
@@ -192,6 +192,12 @@
     border-bottom: 1px solid var(--border); cursor: pointer;
   }
   .participante:last-child { border-bottom: none; }
+  .p-tirar { border: 0; background: none; color: var(--muted); font-size: 15px; cursor: pointer; padding: 4px 6px; margin-left: 4px; border-radius: 8px; }
+  .p-tirar:hover { color: var(--ink); background: var(--grid); }
+  .add-manual { margin-top: 10px; font-size: 13px; color: var(--ink2); }
+  .add-manual label { display: block; margin-bottom: 6px; }
+  .add-linha { display: flex; gap: 8px; }
+  .add-linha input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--baseline); background: var(--surface); color: var(--ink); }
   .participante input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; margin: 0; }
   .participante .p-nome { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .participante .p-hora { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
@@ -264,8 +270,9 @@
   }
   var N = COMPETENCIAS.length;
   var SESSAO = (params.get('s') || 'geral').slice(0, 60);
-  /* rodadas que este aparelho já abriu como apresentador (pra voltar a uma anterior) */
-  var LS_RODADAS = 'roda:rodadas';
+  /* o painel conta as respostas a partir deste momento ("Zerar e começar agora");
+     sem marco, conta desde o começo do dia. O link e o QR nunca mudam. */
+  var LS_MARCO = 'roda:marco:' + SESSAO;
   var MODO_APRESENTAR = params.get('modo') === 'apresentar';
 
   /* paleta categórica validada (ordem fixa, claro/escuro) */
@@ -282,6 +289,10 @@
   var salvo = null;
   try { salvo = JSON.parse(localStorage.getItem(LS_CHAVE) || 'null'); } catch (e) { salvo = null; }
   if (salvo && (!Array.isArray(salvo.valores) || salvo.valores.length !== N)) salvo = null;
+  /* enviou em outro dia (outra apresentação): começa um gráfico novo, só o nome fica */
+  if (salvo && salvo.enviado && (!salvo.enviadoEm || diaLocalIso(salvo.enviadoEm) !== diaLocalIso(Date.now()))) {
+    salvo = { nome: salvo.nome || '', valores: new Array(N).fill(null), enviado: false, sincronizado: false };
+  }
 
   var uid = null;
   try {
@@ -311,6 +322,7 @@
     valores: salvo ? salvo.valores.slice() : new Array(N).fill(null),
     enviado: !!(salvo && salvo.enviado),
     sincronizado: !!(salvo && salvo.sincronizado),
+    enviadoEm: (salvo && salvo.enviadoEm) || null,
     editando: false
   };
 
@@ -322,7 +334,8 @@
   function persistir() {
     try {
       localStorage.setItem(LS_CHAVE, JSON.stringify({
-        nome: estado.nome, valores: estado.valores, enviado: estado.enviado, sincronizado: estado.sincronizado
+        nome: estado.nome, valores: estado.valores, enviado: estado.enviado, sincronizado: estado.sincronizado,
+        enviadoEm: estado.enviado ? (estado.enviadoEm || new Date().toISOString()) : null
       }));
     } catch (e) { /* storage indisponível: segue em memória */ }
   }
@@ -367,7 +380,7 @@
     var passo = 2 * Math.PI / N;
     var out = [];
 
-    out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Roda das competências">');
+    out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Gráfico das competências">');
     if (opts.fundo) out.push('<rect width="' + W + '" height="' + H + '" fill="' + tema.surface + '"/>');
 
     if (opts.titulo) {
@@ -461,6 +474,7 @@
     /* desc + reverse: se passar de 400 linhas, o corte joga fora as antigas, nunca as de hoje */
     var q = SUPA_URL + '/rest/v1/' + TABELA +
       '?sessao=eq.' + encodeURIComponent(SESSAO) +
+      '&criado_em=gte.' + encodeURIComponent(lerMarco()) +
       '&select=nome,notas,criado_em&order=criado_em.desc&limit=400';
     return fetch(q, { headers: cabecalhos }).then(function (r) {
       servidorOk = r.ok;
@@ -571,7 +585,7 @@
     var data = String(hoje.getDate()).padStart(2, '0') + '/' + String(hoje.getMonth() + 1).padStart(2, '0') + '/' + hoje.getFullYear();
     return svgRoda({
       valores: estado.valores, tema: TEMA_CLARO, rotulos: true, numeros: true, fundo: true,
-      titulo: 'Roda das Competências', subtitulo: nomeVisivel() + ' · ' + data
+      titulo: 'Gráfico das Competências', subtitulo: nomeVisivel() + ' · ' + data
     });
   }
 
@@ -584,8 +598,8 @@
     app.innerHTML =
       '<header class="topo">' +
       '<div class="kicker">Autoavaliação</div>' +
-      '<h1>Roda das Competências</h1>' +
-      '<p class="sub">Toque na roda pra dar a nota: quanto mais longe do centro, maior (dá pra arrastar o dedo).</p>' +
+      '<h1>Gráfico das Competências</h1>' +
+      '<p class="sub">Toque em cada fatia pra dar a sua nota: quanto mais pra fora, maior a nota. Dá pra arrastar o dedo.</p>' +
       '</header>' +
       '<div class="palco interativa" id="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
       '<div class="card">' +
@@ -657,6 +671,7 @@
       btn.textContent = 'Enviando...';
       enviarResposta().then(function (ok) {
         estado.enviado = true;
+        estado.enviadoEm = new Date().toISOString();
         estado.sincronizado = ok;
         estado.editando = false;
         persistir();
@@ -671,14 +686,14 @@
   function renderPronto() {
     app.className = 'wrap';
     var avisoSync = estado.sincronizado ? '' :
-      '<div class="aviso">' + ICONES.alerta + '<span>Sua roda ficou salva <b>neste aparelho</b>, mas não chegou ao painel do apresentador. Você pode tentar de novo ou compartilhar a imagem.</span></div>' +
+      '<div class="aviso">' + ICONES.alerta + '<span>Seu gráfico ficou salvo <b>neste celular</b>, mas não chegou ao painel. Tente enviar de novo daqui a pouco. Se preferir, compartilhe a imagem.</span></div>' +
       '<button class="btn fantasma" id="reenviar">Tentar enviar de novo</button>';
 
     app.innerHTML =
       '<header class="topo celebra">' +
-      '<span class="selo">' + ICONES.check + (estado.sincronizado ? 'Roda enviada' : 'Roda pronta') + '</span>' +
+      '<span class="selo">' + ICONES.check + (estado.sincronizado ? 'Enviado!' : 'Gráfico pronto') + '</span>' +
       '<h1 style="margin-top:10px">' + esc(nomeVisivel()) + '</h1>' +
-      '<p class="sub">Essa é a sua roda das competências de hoje.</p>' +
+      '<p class="sub">Esse é o seu gráfico das competências de hoje.</p>' +
       '</header>' +
       '<div class="palco">' + svgRoda({ valores: estado.valores, rotulos: true, numeros: true }) + '</div>' +
       '<div class="card codigo-sorteio"><span>Seu código do sorteio</span><b>' + CODIGO + '</b><small>Se for sorteado, mostre este código.</small></div>' +
@@ -690,7 +705,7 @@
 
     var nomeArq = 'roda-' + nomeVisivel().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') + '.png';
     document.getElementById('compartilhar').addEventListener('click', function () {
-      compartilharPng(svgExport(), nomeArq, 'Minha Roda das Competências');
+      compartilharPng(svgExport(), nomeArq, 'Meu Gráfico das Competências');
     });
     document.getElementById('baixar').addEventListener('click', function () {
       baixarPng(svgExport(), nomeArq, 2);
@@ -706,8 +721,8 @@
       enviarResposta().then(function (ok) {
         estado.sincronizado = ok;
         persistir();
-        if (ok) { toast('Agora foi, roda enviada'); renderPronto(); }
-        else { re.textContent = 'Tentar enviar de novo'; toast('Ainda sem conexão com o painel'); }
+        if (ok) { toast('Pronto, chegou!'); renderPronto(); }
+        else { re.textContent = 'Tentar enviar de novo'; toast('Ainda não foi. Tente de novo daqui a pouco'); }
       });
     });
     document.getElementById('ir-apresentar').addEventListener('click', irApresentar);
@@ -728,33 +743,20 @@
     return u.toString();
   }
 
-  function rotuloRodada(s) {
-    var m = /^r(\d{2})(\d{2})(\d{2})-(\d{2})(\d{2})$/.exec(s);
-    if (m) return 'Rodada de ' + m[3] + '/' + m[2] + ' às ' + m[4] + 'h' + m[5];
-    return s === 'geral' ? 'Rodada geral' : 'Rodada "' + s + '"';
+  function inicioDeHoje() { var d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); }
+  function lerMarco() {
+    var m = null;
+    try { m = localStorage.getItem(LS_MARCO); } catch (e) { m = null; }
+    if (m && !isNaN(Date.parse(m)) && diaLocalIso(m) === diaLocalIso(Date.now())) return m;
+    return inicioDeHoje();
   }
-  function lerRodadas() {
-    try { var l = JSON.parse(localStorage.getItem(LS_RODADAS) || '[]'); return Array.isArray(l) ? l.filter(function (x) { return typeof x === 'string'; }) : []; } catch (e) { return []; }
+  function marcoEhInicioDoDia() { return lerMarco() === inicioDeHoje(); }
+  function rotuloMarco() { return marcoEhInicioDoDia() ? 'o começo de hoje' : 'hoje, ' + horaLocal(lerMarco()); }
+  function definirMarco(iso) {
+    try { if (iso) localStorage.setItem(LS_MARCO, iso); else localStorage.removeItem(LS_MARCO); } catch (e) { /* sem storage */ }
   }
-  function lembrarRodada(s) {
-    var l = lerRodadas().filter(function (x) { return x !== s; });
-    l.unshift(s);
-    try { localStorage.setItem(LS_RODADAS, JSON.stringify(l.slice(0, 20))); } catch (e) { /* sem storage */ }
-  }
-  function irParaRodada(s) {
-    SESSAO = s.slice(0, 60);
-    var u = new URL(location.href);
-    if (SESSAO === 'geral') u.searchParams.delete('s'); else u.searchParams.set('s', SESSAO);
-    try { history.replaceState(null, '', u.toString()); } catch (e) { /* segue sem trocar o endereço */ }
-    sorteio = null;
-    renderApresentar();
-  }
-  function novaRodadaId() {
-    var d = new Date();
-    return 'r' + String(d.getFullYear()).slice(2) + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + pad2(d.getHours()) + pad2(d.getMinutes());
-  }
-  /* quem já ganhou em um sorteio desta rodada (neste aparelho) */
-  function chaveGanhadores() { return 'roda:ganhadores:' + SESSAO; }
+  /* quem já ganhou em um sorteio desde o marco (neste aparelho) */
+  function chaveGanhadores() { return 'roda:ganhadores:' + SESSAO + ':' + lerMarco(); }
   function lerGanhadores() {
     try { var o = JSON.parse(localStorage.getItem(chaveGanhadores()) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; }
   }
@@ -765,7 +767,6 @@
   }
 
   function renderApresentar() {
-    lembrarRodada(SESSAO);
     var link = urlPreencher();
     var qrSvg = '';
     try {
@@ -775,15 +776,15 @@
       qr.make();
       qrSvg = qr.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
     } catch (e) {
-      qrSvg = '<p class="vazio">O QR não carregou (confira a internet e recarregue). Enquanto isso, compartilhe o link abaixo.</p>';
+      qrSvg = '<p class="vazio">O QR não carregou. Confira a internet e recarregue a página. Enquanto isso, mande o link abaixo.</p>';
     }
 
     app.className = 'wrap largo';
     app.innerHTML =
       '<header class="topo">' +
       '<div class="kicker">Modo apresentador</div>' +
-      '<h1>Roda das Competências</h1>' +
-      '<p class="sub">Peça pra turma apontar a câmera pro QR e preencher no celular.</p>' +
+      '<h1>Gráfico das Competências</h1>' +
+      '<p class="sub">Peça pra galera apontar a câmera do celular pro QR e preencher.</p>' +
       '</header>' +
       barraRodada() +
       '<div class="apres-grid">' +
@@ -803,7 +804,7 @@
       '</div>' +
       '<button class="btn" id="abrir-sorteio" disabled>' + ICONES.presente + 'Sortear brindes</button>' +
       '<div id="media-bloco"></div>' +
-      '<div class="secao-titulo" id="titulo-individuais" hidden>Rodas individuais</div>' +
+      '<div class="secao-titulo" id="titulo-individuais" hidden>Gráfico de cada pessoa</div>' +
       '<div class="mini-grade" id="minis"></div>' +
       '</div>' +
       '</div>' +
@@ -832,9 +833,9 @@
         ctx.fillStyle = '#0b0b0b';
         for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr2.isDark(r, c)) ctx.fillRect(mg + c * cs, mg + r * cs, cs, cs);
         ctx.font = '700 34px system-ui, sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('Roda das Competências', tam / 2, tam + 30);
+        ctx.fillText('Gráfico das Competências', tam / 2, tam + 30);
         ctx.font = '400 24px system-ui, sans-serif'; ctx.fillStyle = '#52514e';
-        ctx.fillText('Aponte a câmera e preencha', tam / 2, tam + 66);
+        ctx.fillText('Aponte a câmera e dê suas notas', tam / 2, tam + 66);
         canvas.toBlob(function (png) {
           var a = document.createElement('a');
           a.href = URL.createObjectURL(png);
@@ -858,16 +859,12 @@
   }
 
   function barraRodada() {
-    var outras = lerRodadas().filter(function (x) { return x !== SESSAO; });
-    var sel = outras.length
-      ? '<select id="rodada-anterior" aria-label="Voltar a uma rodada anterior"><option value="">Voltar a uma rodada anterior…</option>' +
-        outras.map(function (x) { return '<option value="' + esc(x) + '">' + esc(rotuloRodada(x)) + '</option>'; }).join('') + '</select>'
-      : '';
-    return '<div class="rodada-barra"><span><b>' + esc(rotuloRodada(SESSAO)) + '</b></span>' +
-      '<button class="btn fantasma mini" id="nova-rodada">Começar rodada nova</button>' + sel + '</div>' +
+    return '<div class="rodada-barra"><span>Contando as respostas desde <b>' + esc(rotuloMarco()) + '</b></span>' +
+      '<button class="btn fantasma mini" id="nova-rodada">Zerar e começar agora</button>' +
+      (marcoEhInicioDoDia() ? '' : '<button class="btn fantasma mini" id="ver-dia">Ver todas de hoje</button>') + '</div>' +
       '<div class="card confirma" id="confirma-rodada" hidden>' +
-      '<p>Na rodada nova, o QR e o link mudam. Quem respondeu antes não aparece no painel nem entra no sorteio. As respostas de antes continuam guardadas, e dá pra voltar a esta rodada pela lista ao lado do botão.</p>' +
-      '<div class="acoes"><button class="btn mini" id="confirma-sim">Começar rodada nova</button>' +
+      '<p>O painel volta pro zero e só conta quem enviar a partir de agora. Quem já respondeu sai do painel e do sorteio, mas as respostas continuam guardadas. O QR e o link continuam os mesmos.</p>' +
+      '<div class="acoes"><button class="btn mini" id="confirma-sim">Zerar agora</button>' +
       '<button class="btn fantasma mini" id="confirma-nao">Cancelar</button></div></div>';
   }
   function ligarBarraRodada() {
@@ -875,11 +872,13 @@
     document.getElementById('nova-rodada').addEventListener('click', function () { caixa.hidden = false; });
     document.getElementById('confirma-nao').addEventListener('click', function () { caixa.hidden = true; });
     document.getElementById('confirma-sim').addEventListener('click', function () {
-      irParaRodada(novaRodadaId());
-      toast('Rodada nova: mostre o QR novo');
+      definirMarco(new Date().toISOString());
+      sorteio = null;
+      renderApresentar();
+      toast('Painel zerado. Pode mostrar o QR');
     });
-    var sel = document.getElementById('rodada-anterior');
-    if (sel) sel.addEventListener('change', function () { if (sel.value) irParaRodada(sel.value); });
+    var dia = document.getElementById('ver-dia');
+    if (dia) dia.addEventListener('click', function () { definirMarco(null); sorteio = null; renderApresentar(); });
   }
 
   function carregarPainel(manual) {
@@ -894,7 +893,7 @@
       document.getElementById('pulso').style.background = 'var(--warn-bord)';
       document.getElementById('abrir-sorteio').disabled = true;
       document.getElementById('estado-servidor').innerHTML =
-        '<div class="aviso">' + ICONES.alerta + '<span>O painel ao vivo ainda não está ligado (tabela não encontrada no banco). Cada pessoa ainda consegue preencher e compartilhar a própria imagem normalmente.</span></div>';
+        '<div class="aviso">' + ICONES.alerta + '<span>O painel não está conseguindo buscar as respostas agora. Confira a internet e toque em Atualizar.</span></div>';
     });
   }
 
@@ -909,7 +908,7 @@
     var tituloInd = document.getElementById('titulo-individuais');
 
     if (!pessoas.length) {
-      mediaBloco.innerHTML = '<div class="card"><p class="vazio">Nenhuma resposta ainda. Assim que alguém enviar, a roda média da turma aparece aqui ao vivo.</p></div>';
+      mediaBloco.innerHTML = '<div class="card"><p class="vazio">Ninguém enviou ainda. Assim que a primeira pessoa enviar, a média da turma aparece aqui, ao vivo.</p></div>';
       minis.innerHTML = '';
       tituloInd.hidden = true;
       return;
@@ -956,13 +955,13 @@
       var validas = linhas.filter(function (l) { return l.notas && Array.isArray(l.notas.valores); });
       var dias = {};
       validas.forEach(function (l) { dias[diaLocalIso(l.criado_em)] = true; });
-      var listaDias = Object.keys(dias).sort().reverse();
+      var listaDias = [];
       var hoje = diaLocalIso(Date.now());
       sorteio = {
         linhas: validas,
         dias: listaDias,
         /* sem resposta hoje: cai no dia mais recente, nunca mistura dinamicas por padrao */
-        escopo: dias[hoje] ? hoje : (listaDias[0] || 'todas'),
+        escopo: 'todas',
         /* quem já ganhou um brinde nesta rodada começa fora (dá pra marcar de novo) */
         excluidos: (function () { var g = lerGanhadores(), o = {}; for (var k in g) o[k] = true; return o; })(),
         ganhadores: lerGanhadores(),
@@ -971,7 +970,7 @@
       };
       renderSorteioSetup();
     }).catch(function () {
-      toast('Não deu pra buscar as respostas, tente de novo');
+      toast('Não deu pra buscar as respostas. Tente de novo');
       sorteio = null;
       renderApresentar();
     });
@@ -982,8 +981,20 @@
     if (sorteio.escopo !== 'todas') {
       linhas = linhas.filter(function (l) { return diaLocalIso(l.criado_em) === sorteio.escopo; });
     }
-    return deduplicar(linhas);
+    return deduplicar(linhas).concat(lerExtras().map(function (x) {
+      return { nome: x.nome, notas: { uid: x.id, codigo: '' }, criado_em: x.em, manual: true };
+    }));
   }
+  /* quem esqueceu o celular: o apresentador põe o nome à mão (só neste aparelho, desde o marco) */
+  function chaveExtras() { return 'roda:extras:' + SESSAO + ':' + lerMarco(); }
+  function lerExtras() {
+    try { var l = JSON.parse(localStorage.getItem(chaveExtras()) || 'null'); return Array.isArray(l) ? l : (extrasNaMemoria || []); } catch (e) { return extrasNaMemoria || []; }
+  }
+  function gravarExtras(l) {
+    try { localStorage.setItem(chaveExtras(), JSON.stringify(l)); } catch (e) { /* sem storage: vale só até recarregar */ }
+    extrasNaMemoria = l;
+  }
+  var extrasNaMemoria = null;
   function poolSorteio() {
     return participantesEscopo().filter(function (p) { return !sorteio.excluidos[chavePessoa(p)]; });
   }
@@ -993,8 +1004,7 @@
     return deduplicar(linhas).length;
   }
   function escopoLabel() {
-    if (sorteio.escopo === 'todas') return 'Todos os dias';
-    return sorteio.escopo === diaLocalIso(Date.now()) ? 'Rodas de hoje' : 'Rodas de ' + rotuloDia(sorteio.escopo);
+    return 'Respostas desde ' + rotuloMarco();
   }
 
   function renderSorteioSetup() {
@@ -1017,7 +1027,9 @@
       return '<label class="participante' + (fora ? ' fora' : '') + '">' +
         '<input type="checkbox" data-i="' + i + '"' + (fora ? '' : ' checked') + '>' +
         '<span class="p-nome">' + esc(p.nome) + (sorteio.ganhadores && sorteio.ganhadores[chavePessoa(p)] ? '<span class="p-ganhou">já ganhou</span>' : '') + '</span>' +
-        '<span class="p-hora">' + esc(codigoDaPessoa(p)) + ' · ' + horaLocal(p.criado_em) + '</span>' +
+        (p.manual
+          ? '<span class="p-hora">sem celular</span><button type="button" class="p-tirar" data-tirar="' + esc(p.notas.uid) + '" aria-label="Tirar ' + esc(p.nome) + ' da lista">✕</button>'
+          : '<span class="p-hora">' + esc(codigoDaPessoa(p)) + ' · ' + horaLocal(p.criado_em) + '</span>') +
         '</label>';
     }).join('');
 
@@ -1026,16 +1038,21 @@
       '<header class="topo">' +
       '<div class="kicker">Modo apresentador</div>' +
       '<h1>Sorteio de brindes</h1>' +
-      '<p class="sub">Só entra quem preencheu a roda e enviou nesta rodada. Desmarque quem não está na sala.</p>' +
+      '<p class="sub">Concorre quem enviou o gráfico. Desmarque quem já foi embora.</p>' +
       '</header>' +
-      (chips ? '<div class="secao-titulo">Rodas de quando?</div><div class="chips">' + chips + '</div>' : '') +
+      (chips ? '<div class="secao-titulo">Respostas de quando?</div><div class="chips">' + chips + '</div>' : '') +
       '<div class="secao-titulo" style="display:flex;align-items:center;gap:8px">' +
       '<span>Participantes · <span id="qtd-pool">' + pool.length + '</span> no sorteio</span>' +
       '<button class="btn fantasma" id="atualizar-lista" style="width:auto;margin:0 0 0 auto;padding:6px 10px;font-size:12px">' + ICONES.atualizar + 'Atualizar</button>' +
       '</div>' +
       '<div class="card lista-participantes" id="lista-part">' +
-      (itens || '<p class="vazio">Ninguém enviou nesse dia ainda.</p>') +
+      (itens || '<p class="vazio">Ninguém enviou ainda.</p>') +
       '</div>' +
+      '<form class="add-manual" id="form-extra">' +
+      '<label for="nome-extra">Alguém está sem celular? Põe o nome aqui:</label>' +
+      '<div class="add-linha"><input type="text" id="nome-extra" maxlength="40" placeholder="Nome da pessoa" autocomplete="off">' +
+      '<button type="submit" class="btn fantasma mini">Adicionar</button></div>' +
+      '</form>' +
       '<div class="secao-titulo">Quantos brindes?</div>' +
       '<div class="card stepper">' +
       '<button id="menos" aria-label="Menos um brinde"' + (sorteio.qtd <= 1 ? ' disabled' : '') + '>−</button>' +
@@ -1058,14 +1075,36 @@
         var dias = {};
         validas.forEach(function (l) { dias[diaLocalIso(l.criado_em)] = true; });
         sorteio.linhas = validas;
-        sorteio.dias = Object.keys(dias).sort().reverse();
+        sorteio.dias = [];
         if (sorteio.escopo !== 'todas' && !dias[sorteio.escopo]) sorteio.escopo = sorteio.dias[0] || 'todas';
         renderSorteioSetup();
         toast('Lista atualizada');
-      }).catch(function () { toast('Não deu pra atualizar, tente de novo'); });
+      }).catch(function () { toast('Não deu pra atualizar. Tente de novo'); });
     });
 
     var lista = document.getElementById('lista-part');
+    lista.addEventListener('click', function (e) {
+      var t = e.target.closest ? e.target.closest('[data-tirar]') : null;
+      if (!t) return;
+      e.preventDefault();
+      var id = t.getAttribute('data-tirar');
+      gravarExtras(lerExtras().filter(function (x) { return x.id !== id; }));
+      delete sorteio.excluidos[id];
+      renderSorteioSetup();
+    });
+    document.getElementById('form-extra').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var campo = document.getElementById('nome-extra');
+      var nome = campo.value.trim().slice(0, 40);
+      if (nome.length < 2) { toast('Escreva o nome da pessoa'); campo.focus(); return; }
+      var l = lerExtras();
+      l.push({ id: 'manual:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nome: nome, em: new Date().toISOString() });
+      gravarExtras(l);
+      renderSorteioSetup();
+      toast(nome + ' entrou no sorteio');
+      var lp = document.getElementById('lista-part');
+      if (lp) lp.scrollTop = lp.scrollHeight;
+    });
     lista.addEventListener('change', function (e) {
       var cb = e.target;
       if (cb.tagName !== 'INPUT') return;
@@ -1216,7 +1255,7 @@
     ctx.font = '800 34px system-ui, sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('Sorteio de brindes', L / 2, 56);
     ctx.font = '400 18px system-ui, sans-serif'; ctx.fillStyle = '#52514e';
-    ctx.fillText('Roda das Competências · ' + escopoLabel() + ' · ' + data, L / 2, 88);
+    ctx.fillText('Gráfico das Competências · ' + escopoLabel() + ' · ' + data, L / 2, 88);
     ctx.textAlign = 'left';
     sorteio.vencedores.forEach(function (v, i) {
       var y = topo + i * linhaAltura;
