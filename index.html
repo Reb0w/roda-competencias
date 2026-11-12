@@ -115,7 +115,7 @@
   .rodada-barra { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px; margin: 4px 0 14px; font-size: 14px; color: var(--ink2); }
   .rodada-barra b { color: var(--ink); }
   .rodada-barra select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--baseline); background: var(--surface); color: var(--ink); max-width: 100%; }
-  .btn.mini { width: auto; margin: 0; padding: 7px 12px; font-size: 13px; }
+  .btn.curto { width: auto; margin: 0; padding: 7px 12px; font-size: 13px; }
   .confirma { margin: 0 0 14px; }
   .confirma p { margin: 0 0 10px; font-size: 14px; color: var(--ink2); }
   .confirma .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -860,12 +860,12 @@
 
   function barraRodada() {
     return '<div class="rodada-barra"><span>Contando as respostas desde <b>' + esc(rotuloMarco()) + '</b></span>' +
-      '<button class="btn fantasma mini" id="nova-rodada">Zerar e começar agora</button>' +
-      (marcoEhInicioDoDia() ? '' : '<button class="btn fantasma mini" id="ver-dia">Ver todas de hoje</button>') + '</div>' +
+      '<button class="btn fantasma curto" id="nova-rodada">Zerar e começar agora</button>' +
+      (marcoEhInicioDoDia() ? '' : '<button class="btn fantasma curto" id="ver-dia">Ver todas de hoje</button>') + '</div>' +
       '<div class="card confirma" id="confirma-rodada" hidden>' +
       '<p>O painel volta pro zero e só conta quem enviar a partir de agora. Quem já respondeu sai do painel e do sorteio, mas as respostas continuam guardadas. O QR e o link continuam os mesmos.</p>' +
-      '<div class="acoes"><button class="btn mini" id="confirma-sim">Zerar agora</button>' +
-      '<button class="btn fantasma mini" id="confirma-nao">Cancelar</button></div></div>';
+      '<div class="acoes"><button class="btn curto" id="confirma-sim">Zerar agora</button>' +
+      '<button class="btn fantasma curto" id="confirma-nao">Cancelar</button></div></div>';
   }
   function ligarBarraRodada() {
     var caixa = document.getElementById('confirma-rodada');
@@ -1051,7 +1051,7 @@
       '<form class="add-manual" id="form-extra">' +
       '<label for="nome-extra">Alguém está sem celular? Põe o nome aqui:</label>' +
       '<div class="add-linha"><input type="text" id="nome-extra" maxlength="40" placeholder="Nome da pessoa" autocomplete="off">' +
-      '<button type="submit" class="btn fantasma mini">Adicionar</button></div>' +
+      '<button type="submit" class="btn fantasma curto">Adicionar</button></div>' +
       '</form>' +
       '<div class="secao-titulo">Quantos brindes?</div>' +
       '<div class="card stepper">' +
