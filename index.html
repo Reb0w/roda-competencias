@@ -116,6 +116,7 @@
   .rodada-barra b { color: var(--ink); }
   .rodada-barra select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--baseline); background: var(--surface); color: var(--ink); max-width: 100%; }
   .logo-marca { display: block; height: 60px; width: auto; margin: 0 auto 12px; padding: 8px 16px; background: #ffffff; border-radius: 14px; box-shadow: var(--shadow); }
+  .contador .auto { font-size: 12px; color: var(--muted); margin-left: 4px; }
   .btn.curto { width: auto; margin: 0; padding: 7px 12px; font-size: 13px; }
   .confirma { margin: 0 0 14px; }
   .confirma p { margin: 0 0 10px; font-size: 14px; color: var(--ink2); }
@@ -801,7 +802,7 @@
       '</div>' +
       '<div>' +
       '<div class="card">' +
-      '<div class="contador"><span class="pulso" id="pulso"></span><b id="qtd">–</b><span>respostas</span>' +
+      '<div class="contador"><span class="pulso" id="pulso"></span><b id="qtd">–</b><span id="qtd-rotulo">respostas</span><span class="auto">atualiza sozinho</span>' +
       '<button class="btn fantasma" id="atualizar" style="width:auto;margin:0 0 0 auto;padding:8px 12px;font-size:13px">' + ICONES.atualizar + 'Atualizar</button></div>' +
       '<div id="estado-servidor"></div>' +
       '</div>' +
@@ -902,6 +903,7 @@
 
   function pintarPainel(pessoas) {
     document.getElementById('qtd').textContent = pessoas.length;
+    document.getElementById('qtd-rotulo').textContent = pessoas.length === 1 ? 'resposta' : 'respostas';
     document.getElementById('pulso').style.background = 'var(--ok)';
     document.getElementById('abrir-sorteio').disabled = !pessoas.length;
     document.getElementById('estado-servidor').innerHTML = '';
