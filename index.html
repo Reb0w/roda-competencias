@@ -115,6 +115,7 @@
   .rodada-barra { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px; margin: 4px 0 14px; font-size: 14px; color: var(--ink2); }
   .rodada-barra b { color: var(--ink); }
   .rodada-barra select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--baseline); background: var(--surface); color: var(--ink); max-width: 100%; }
+  .logo-marca { display: block; height: 60px; width: auto; margin: 0 auto 12px; padding: 8px 16px; background: #ffffff; border-radius: 14px; box-shadow: var(--shadow); }
   .btn.curto { width: auto; margin: 0; padding: 7px 12px; font-size: 13px; }
   .confirma { margin: 0 0 14px; }
   .confirma p { margin: 0 0 10px; font-size: 14px; color: var(--ink2); }
@@ -500,6 +501,8 @@
 
   /* ---------- helpers de UI ---------- */
   var app = document.getElementById('app');
+  /* a marca da empresa nas telas do apresentador (painel e sorteio), não na de quem preenche */
+  var LOGO = '<img src="logo-caixa.png" alt="CAIXA" class="logo-marca" width="325" height="129">';
   var toastEl = document.getElementById('toast');
   var toastTimer = null;
   function toast(msg) {
@@ -781,7 +784,7 @@
 
     app.className = 'wrap largo';
     app.innerHTML =
-      '<header class="topo">' +
+      '<header class="topo">' + LOGO +
       '<div class="kicker">Modo apresentador</div>' +
       '<h1>Gráfico das Competências</h1>' +
       '<p class="sub">Peça pra galera apontar a câmera do celular pro QR e preencher.</p>' +
@@ -1035,7 +1038,7 @@
 
     app.className = 'wrap';
     app.innerHTML =
-      '<header class="topo">' +
+      '<header class="topo">' + LOGO +
       '<div class="kicker">Modo apresentador</div>' +
       '<h1>Sorteio de brindes</h1>' +
       '<p class="sub">Concorre quem enviou o gráfico. Desmarque quem já foi embora.</p>' +
@@ -1145,7 +1148,7 @@
 
     app.className = 'wrap';
     app.innerHTML =
-      '<header class="topo">' +
+      '<header class="topo">' + LOGO +
       '<div class="kicker">' + n + 'º brinde' + (sorteio.qtd > 1 ? ' de ' + sorteio.qtd : '') + '</div>' +
       '<h1>E o brinde vai pra...</h1>' +
       '</header>' +
@@ -1213,7 +1216,7 @@
 
     app.className = 'wrap';
     app.innerHTML =
-      '<header class="topo celebra">' +
+      '<header class="topo celebra">' + LOGO +
       '<span class="selo">' + ICONES.check + 'Sorteio concluído</span>' +
       '<h1 style="margin-top:10px">Ganhadores</h1>' +
       '<p class="sub">' + escopoLabel() + ' · ' + sorteio.vencedores.length +
